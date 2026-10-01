@@ -18,9 +18,9 @@ export async function onRequest(context) {
     const TO_EMAIL = 'glen@ohmworks.com.au';
 
     if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
-      // If not configured, write to D1 or log — here we just return success for demo
-      console.log('MAILGUN not configured; message:\n', text);
-      return new Response(JSON.stringify({ ok: true, message: 'Mailgun not configured in environment. Message logged.' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      // Not configured: log it and report failure so the customer is told to phone instead
+      console.error('MAILGUN not configured; message not sent:\n', text);
+      return new Response(JSON.stringify({ error: 'Email is not configured. Please call 0416 481 450.' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
     }
 
     const body = new URLSearchParams();
