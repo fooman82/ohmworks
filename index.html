@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OHMWORKS — Electrical Contracting</title>
+  <meta name="description" content="OHMWORKS — new electrical installation, refurbishment, fault finding and repairs for residential and commercial customers.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <img src="/images/logo.jpg" alt="OHMWORKS logo" class="logo">
+      <nav class="contact-info">
+        <a href="tel:0416481450">0416 481 450</a>
+        <a href="mailto:glen@ogmworks.com.au">glen@ogmworks.com.au</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <h1>OHMWORKS</h1>
+        <p class="tag">Electrical contracting — new installs, refurbishments, fault finding and repairs</p>
+        <a class="cta" href="#contact">Get a quote</a>
+      </div>
+    </section>
+
+    <section class="services container">
+      <h2>Services</h2>
+      <ul>
+        <li>New electrical installations (residential & commercial)</li>
+        <li>Refurbishment & rewiring</li>
+        <li>Fault finding & diagnostics</li>
+        <li>Repairs, maintenance and safety checks</li>
+        <li>Switchboard upgrades & safety switches</li>
+      </ul>
+    </section>
+
+    <section id="contact" class="contact container">
+      <h2>Contact OHMWORKS</h2>
+      <p>Call us: <a href="tel:0416481450">0416 481 450</a> or use the form below.</p>
+
+      <form id="contactForm">
+        <div class="row">
+          <label>Name<input name="name" type="text" required></label>
+          <label>Email<input name="email" type="email" required></label>
+        </div>
+        <div class="row">
+          <label>Phone<input name="phone" type="tel"></label>
+          <label>Suburb<input name="suburb" type="text"></label>
+        </div>
+
+        <fieldset>
+          <legend>Services of interest</legend>
+          <label><input type="checkbox" name="services" value="New installation"> New installation</label>
+          <label><input type="checkbox" name="services" value="Refurbishment"> Refurbishment</label>
+          <label><input type="checkbox" name="services" value="Fault finding"> Fault finding</label>
+          <label><input type="checkbox" name="services" value="Repairs"> Repairs</label>
+        </fieldset>
+
+        <label>Message<textarea name="message" rows="6"></textarea></label>
+
+        <button type="submit">Send enquiry</button>
+        <p id="formMessage" class="form-message" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="footer container">
+      <p>OHMWORKS — Licensed electrician. <strong>Lic: 501107C</strong></p>
+      <p>Website: <a href="https://www.ohmworks.com.au">www.ohmworks.com.au</a></p>
+    </section>
+  </main>
+
+  <script>
+  // Front-end form submit using fetch to Cloudflare Pages Function at /api/contact
+  document.getElementById('contactForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const f = e.target;
+    const data = {
+      name: f.name.value,
+      email: f.email.value,
+      phone: f.phone.value,
+      suburb: f.suburb.value,
+      services: Array.from(f.querySelectorAll('input[name="services"]:checked')).map(n => n.value),
+      message: f.message.value
+    };
+
+    const msgEl = document.getElementById('formMessage');
+    msgEl.textContent = 'Sending...';
+    try {
+      const r = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const json = await r.json();
+      if (r.ok) {
+        msgEl.textContent = 'Thanks — your message was sent. We will be in touch shortly.';
+        f.reset();
+      } else {
+        msgEl.textContent = json.error || 'Submission failed — please call 0416 481 450.';
+      }
+    } catch (err) {
+      msgEl.textContent = 'Network error — please call 0416 481 450.';
+    }
+  });
+  </script>
+</body>
+</html>

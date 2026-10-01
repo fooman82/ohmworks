@@ -1,0 +1,41 @@
+# Git ignore for OHMWORKS site
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log
+
+# Environment
+.env
+.env.*.local
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Build outputs
+dist/
+out/
+
+# Logs
+logs/
+*.log
+
+# Local files
+*.local
+
+# Secrets
+.env.local
+
+# Pages build cache
+.cf-cache/
+
+# Optional: don't ignore images if you want them in repo
+# images/
