@@ -1,48 +1,53 @@
-export async function onRequest(context) {
+// Pages Function: validates the form post and forwards it to the ohmworks-contact Worker,
+// which sends the email through Cloudflare Email Routing.
+// Required Pages settings: CONTACT_WORKER_URL (variable), CONTACT_SECRET (secret)
+
+const json = (obj, status = 200) =>
+  new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
+
+export async function onRequestPost(context) {
   try {
-    const req = context.request;
-    if (req.method !== 'POST') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { 'Content-Type': 'application/json' } });
+    const { CONTACT_WORKER_URL, CONTACT_SECRET } = context.env;
 
-    const data = await req.json();
-    // Basic validation
+    let data;
+    try {
+      data = await context.request.json();
+    } catch {
+      return json({ error: 'Invalid request' }, 400);
+    }
+
     if (!data || !data.name || !data.email || !data.phone || !data.description) {
-      return new Response(JSON.stringify({ error: 'Name, email, phone, and project description are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      return json({ error: 'Name, email, phone, and project description are required' }, 400);
     }
 
-    // Construct email body
-    const text = `New enquiry from OHMWORKS website\n\n=== CUSTOMER DETAILS ===\nName: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || 'Not provided'}\nSuburb/Location: ${data.suburb || 'Not provided'}\n\n=== PROJECT DESCRIPTION ===\n${data.description || 'No description provided'}`;
-
-    // Send email using Mailgun or SendGrid — using Mailgun as example; expects MAILGUN_API_KEY and MAILGUN_DOMAIN
-    const MAILGUN_API_KEY = context.env.MAILGUN_API_KEY;
-    const MAILGUN_DOMAIN = context.env.MAILGUN_DOMAIN;
-    const TO_EMAIL = 'glen@ohmworks.com.au';
-
-    if (!MAILGUN_API_KEY || !MAILGUN_DOMAIN) {
-      // Not configured: log it and report failure so the customer is told to phone instead
-      console.error('MAILGUN not configured; message not sent:\n', text);
-      return new Response(JSON.stringify({ error: 'Email is not configured. Please call 0416 481 450.' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+    if (!CONTACT_WORKER_URL || !CONTACT_SECRET) {
+      console.error('CONTACT_WORKER_URL / CONTACT_SECRET not configured');
+      return json({ error: 'Email is not configured. Please call 0416 481 450.' }, 503);
     }
 
-    const body = new URLSearchParams();
-    body.append('from', `OHMWORKS Website <mailgun@${MAILGUN_DOMAIN}>`);
-    body.append('to', TO_EMAIL);
-    body.append('subject', `New enquiry from OHMWORKS: ${data.name}`);
-    body.append('text', text);
-
-    const resp = await fetch(`https://api.mailgun.net/v3/${MAILGUN_DOMAIN}/messages`, {
+    const resp = await fetch(CONTACT_WORKER_URL, {
       method: 'POST',
-      headers: { 'Authorization': 'Basic ' + btoa('api:' + MAILGUN_API_KEY) },
-      body
+      headers: { 'Content-Type': 'application/json', 'X-Contact-Secret': CONTACT_SECRET },
+      body: JSON.stringify({
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        suburb: data.suburb,
+        description: data.description,
+      }),
     });
 
+    const result = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      const txt = await resp.text();
-      return new Response(JSON.stringify({ error: 'Failed to send email', details: txt }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+      return json({ error: result.error || 'Failed to send. Please call 0416 481 450.' }, resp.status === 400 ? 400 : 502);
     }
-
-    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return json({ ok: true });
   } catch (err) {
     console.error(err);
-    return new Response(JSON.stringify({ error: 'Server error' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    return json({ error: 'Server error. Please call 0416 481 450.' }, 500);
   }
+}
+
+export async function onRequest() {
+  return json({ error: 'Method not allowed' }, 405);
 }

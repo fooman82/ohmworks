@@ -1,0 +1,15 @@
+name = "ohmworks-contact"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+[vars]
+FROM_ADDRESS = "website@ohmworks.com.au"
+TO_ADDRESS = "glen@ohmworks.com.au"
+
+# Requires Email Routing enabled on ohmworks.com.au and the destination address verified
+[[send_email]]
+name = "EMAIL"
+destination_address = "glen@ohmworks.com.au"
+
+# Secret (set with: wrangler secret put CONTACT_SECRET)
+#   CONTACT_SECRET
