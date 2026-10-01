@@ -5,12 +5,12 @@ export async function onRequest(context) {
 
     const data = await req.json();
     // Basic validation
-    if (!data || !data.name || !data.email) {
-      return new Response(JSON.stringify({ error: 'Name and email are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (!data || !data.name || !data.email || !data.phone || !data.description) {
+      return new Response(JSON.stringify({ error: 'Name, email, phone, and project description are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
 
     // Construct email body
-    const text = `New contact from OHMWORKS website\n\nName: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || ''}\nSuburb: ${data.suburb || ''}\nServices: ${Array.isArray(data.services)?data.services.join(', '):''}\n\nMessage:\n${data.message || ''}`;
+    const text = `New enquiry from OHMWORKS website\n\n=== CUSTOMER DETAILS ===\nName: ${data.name}\nEmail: ${data.email}\nPhone: ${data.phone || 'Not provided'}\nSuburb/Location: ${data.suburb || 'Not provided'}\n\n=== PROJECT DESCRIPTION ===\n${data.description || 'No description provided'}`;
 
     // Send email using Mailgun or SendGrid — using Mailgun as example; expects MAILGUN_API_KEY and MAILGUN_DOMAIN
     const MAILGUN_API_KEY = context.env.MAILGUN_API_KEY;
