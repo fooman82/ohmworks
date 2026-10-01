@@ -39,3 +39,5 @@ logs/
 
 # Optional: don't ignore images if you want them in repo
 # images/
+
+.wrangler/
