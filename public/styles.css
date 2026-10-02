@@ -386,10 +386,12 @@ button:active{
   /* Compact, non-sticky header so it doesn't eat the screen */
   .site-header{position:static}
   .header-container{flex-direction:column;gap:8px;padding:8px 16px}
-  .logo-section{max-width:100%;gap:10px}
-  .logo{height:46px;width:auto;flex:0 0 auto}
-  /* Name image scales to the space left beside the icon so it never overflows */
-  .logo-name{height:auto;width:min(240px,calc(100vw - 130px));max-width:100%;min-width:0}
+  .site-header{overflow:hidden}
+  .header-container{width:100%;box-sizing:border-box}
+  .logo-section{width:100%;max-width:100%;gap:8px;justify-content:center;box-sizing:border-box;min-width:0}
+  .logo{height:40px;width:auto;flex:0 0 auto}
+  /* Name image takes the remaining space beside the icon and shrinks to fit */
+  .logo-name{flex:1 1 0;min-width:0;width:auto;max-width:240px;height:auto;object-fit:contain}
   .contact-quick{flex-wrap:wrap;justify-content:center}
   nav{gap:16px;flex-wrap:wrap;justify-content:center}
   .nav-divider{display:none}
