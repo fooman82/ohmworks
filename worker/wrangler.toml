@@ -3,10 +3,15 @@ main = "src/index.js"
 compatibility_date = "2024-09-01"
 
 [vars]
-# Must be an address on a domain verified in Resend
-FROM_ADDRESS = "OHMWORKS Website <website@ohmworks.com.au>"
+# Sender must be on the domain verified in Mailgun (MAILGUN_DOMAIN below)
+# If MAILGUN_DOMAIN is a subdomain such as mg.ohmworks.com.au, FROM can still be website@ohmworks.com.au
+FROM_ADDRESS = "OHMWORKS Website <website@mg.ohmworks.com.au>"
 TO_ADDRESS = "glen@ohmworks.com.au"
+# Verified Mailgun sending domain (a subdomain keeps Office 365 mail records untouched)
+MAILGUN_DOMAIN = "mg.ohmworks.com.au"
+# Use "https://api.eu.mailgun.net" for EU-region Mailgun accounts
+MAILGUN_API_BASE = "https://api.mailgun.net"
 
 # Secrets (set with: wrangler secret put <NAME>)
-#   CONTACT_SECRET   shared with the Pages function
-#   RESEND_API_KEY   from resend.com
+#   CONTACT_SECRET     shared with the Pages function
+#   MAILGUN_API_KEY    Mailgun private API key (or a domain sending key)

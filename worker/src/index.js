@@ -15,8 +15,8 @@ export default {
       return json({ error: 'Unauthorized' }, 401);
     }
 
-    if (!env.RESEND_API_KEY) {
-      console.error('RESEND_API_KEY not configured');
+    if (!env.MAILGUN_API_KEY || !env.MAILGUN_DOMAIN) {
+      console.error('MAILGUN_API_KEY / MAILGUN_DOMAIN not configured');
       return json({ error: 'Email is not configured' }, 503);
     }
 
@@ -53,25 +53,26 @@ export default {
       `<strong>Suburb:</strong> ${esc(suburb || 'Not provided')}</p>` +
       `<p><strong>Description:</strong></p><p>${esc(description).replace(/\n/g, '<br>')}</p>`;
 
+    // Mailgun HTTP API (use https://api.eu.mailgun.net for EU-region accounts)
+    const apiBase = env.MAILGUN_API_BASE || 'https://api.mailgun.net';
+
+    const form = new FormData();
+    form.append('from', env.FROM_ADDRESS);
+    form.append('to', env.TO_ADDRESS);
+    form.append('h:Reply-To', email);
+    form.append('subject', `New enquiry from ${name}`);
+    form.append('text', text);
+    form.append('html', html);
+
     try {
-      const resp = await fetch('https://api.resend.com/emails', {
+      const resp = await fetch(`${apiBase}/v3/${env.MAILGUN_DOMAIN}/messages`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: env.FROM_ADDRESS,
-          to: [env.TO_ADDRESS],
-          reply_to: email,
-          subject: `New enquiry from ${name}`,
-          text,
-          html,
-        }),
+        headers: { Authorization: 'Basic ' + btoa('api:' + env.MAILGUN_API_KEY) },
+        body: form,
       });
 
       if (!resp.ok) {
-        console.error('Resend error', resp.status, await resp.text());
+        console.error('Mailgun error', resp.status, await resp.text());
         return json({ error: 'Failed to send email' }, 502);
       }
       return json({ ok: true });
