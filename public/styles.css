@@ -389,9 +389,10 @@ button:active{
   .site-header{overflow:hidden}
   .header-container{width:100%;box-sizing:border-box}
   .logo-section{width:100%;max-width:100%;gap:8px;justify-content:center;box-sizing:border-box;min-width:0}
-  .logo{height:40px;width:auto;flex:0 0 auto}
-  /* Name image takes the remaining space beside the icon and shrinks to fit */
-  .logo-name{flex:1 1 0;min-width:0;width:auto;max-width:240px;height:auto;object-fit:contain}
+  .logo{height:auto;max-height:40px;width:auto;max-width:18vw;flex:0 1 auto;min-width:0}
+  /* Hard viewport-based caps so the images can never exceed the screen */
+  .logo-name{height:auto;max-height:40px;width:auto;max-width:68vw;flex:0 1 auto;min-width:0;object-fit:contain}
+  html,body{overflow-x:hidden;max-width:100%}
   .contact-quick{flex-wrap:wrap;justify-content:center}
   nav{gap:16px;flex-wrap:wrap;justify-content:center}
   .nav-divider{display:none}
