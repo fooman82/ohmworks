@@ -195,14 +195,17 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      const json = await r.json();
+      // The response may not be JSON (e.g. an edge error page), so parse defensively
+      const raw = await r.text();
+      let json = {};
+      try { json = JSON.parse(raw); } catch (e) { json = {}; }
       if (r.ok) {
         msgEl.textContent = '✓ Thank you! Your enquiry has been sent. We\'ll contact you within 24 hours.';
         msgEl.classList.remove('error');
         msgEl.classList.add('success');
         f.reset();
       } else {
-        msgEl.textContent = json.error || 'Submission failed. Please call 0416 481 450.';
+        msgEl.textContent = (json.error || 'We could not send your enquiry (error ' + r.status + ').') + ' Please call 0416 481 450 if this continues.';
         msgEl.classList.remove('success');
         msgEl.classList.add('error');
       }
