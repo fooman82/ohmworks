@@ -13,6 +13,8 @@
 
 *{box-sizing:border-box}
 
+img{max-width:100%}
+
 html,body{margin:0;padding:0;height:100%}
 
 body{
@@ -384,8 +386,11 @@ button:active{
   /* Compact, non-sticky header so it doesn't eat the screen */
   .site-header{position:static}
   .header-container{flex-direction:column;gap:8px;padding:8px 16px}
-  .logo{height:46px}
-  .logo-name{height:30px}
+  .logo-section{max-width:100%;gap:10px}
+  .logo{height:46px;width:auto;flex:0 0 auto}
+  /* Name image scales to the space left beside the icon so it never overflows */
+  .logo-name{height:auto;width:min(240px,calc(100vw - 130px));max-width:100%;min-width:0}
+  .contact-quick{flex-wrap:wrap;justify-content:center}
   nav{gap:16px;flex-wrap:wrap;justify-content:center}
   .nav-divider{display:none}
   .contact-quick{flex-direction:row;gap:16px}
