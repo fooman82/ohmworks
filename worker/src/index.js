@@ -64,15 +64,45 @@ export default {
     form.append('text', text);
     form.append('html', html);
 
+    // Trim stray whitespace/newlines that often sneak in when pasting a key
+    const apiKey = String(env.MAILGUN_API_KEY).trim();
+    const domain = String(env.MAILGUN_DOMAIN).trim();
+
     try {
-      const resp = await fetch(`${apiBase}/v3/${env.MAILGUN_DOMAIN}/messages`, {
+      const resp = await fetch(`${apiBase}/v3/${domain}/messages`, {
         method: 'POST',
-        headers: { Authorization: 'Basic ' + btoa('api:' + env.MAILGUN_API_KEY) },
+        headers: { Authorization: 'Basic ' + btoa('api:' + apiKey) },
         body: form,
       });
 
       if (!resp.ok) {
-        console.error('Mailgun error', resp.status, await resp.text());
+        const detail = await resp.text();
+        console.error('Mailgun error', resp.status, detail);
+        if (resp.status === 401 || resp.status === 403) {
+          // Diagnostics only: never log the key itself
+          const shape = /^[0-9a-f]{32}-[0-9a-f]{8}-[0-9a-f]{8}$/i.test(apiKey) ? 'new-style key'
+            : /^key-[0-9a-f]{32}$/i.test(apiKey) ? 'legacy key-xxxx'
+            : /^[0-9a-f]{32}$/i.test(apiKey) ? '32-hex (public/webhook key?)'
+            : 'unrecognised format';
+          console.error(`Auth diagnostics: apiBase=${apiBase} domain=${domain} keyLength=${apiKey.length} keyShape=${shape} hadWhitespace=${apiKey !== String(env.MAILGUN_API_KEY)}`);
+
+          // Probe the other region and the account's domain list (read-only) to pinpoint the cause
+          const other = apiBase.includes('.eu.') ? 'https://api.mailgun.net' : 'https://api.eu.mailgun.net';
+          const auth = { Authorization: 'Basic ' + btoa('api:' + apiKey) };
+          const probeOther = await fetch(`${other}/v3/domains?limit=5`, { headers: auth });
+          const probeThis = await fetch(`${apiBase}/v3/domains?limit=20`, { headers: auth });
+          console.error(`Probe: this region domains=${probeThis.status}, other region (${other}) domains=${probeOther.status}`);
+          // Domain names and states are not secret; log them so a name mismatch is obvious
+          for (const [label, p] of [['this region', probeThis], ['other region', probeOther]]) {
+            try {
+              const body = await p.clone().json();
+              const list = (body.items || []).map((d) => `${d.name}:${d.state}`).join(', ');
+              console.error(`Domains (${label}): total=${body.total_count ?? 'n/a'} [${list}]`);
+            } catch (e) {
+              console.error(`Domains (${label}): could not read response`);
+            }
+          }
+        }
         return json({ error: 'Failed to send email' }, 502);
       }
       return json({ ok: true });
