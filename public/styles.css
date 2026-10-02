@@ -48,12 +48,15 @@ a:hover{text-decoration:underline}
 .logo-section{
   display:flex;
   align-items:center;
-  gap:12px;
+  gap:14px;
+  text-decoration:none;
 }
 
-.logo{height:48px;width:auto}
+.logo-section:hover{text-decoration:none}
 
-.logo-text{font-size:20px;font-weight:bold;color:var(--text-primary)}
+.logo{height:56px;width:auto;display:block}
+
+.logo-name{height:36px;width:auto;display:block}
 
 nav{display:flex;gap:32px;align-items:center}
 
@@ -375,6 +378,8 @@ button:active{
 /* Responsive */
 @media(max-width:768px){
   .header-container{flex-direction:column;gap:12px;padding:10px 20px}
+  .logo{height:44px}
+  .logo-name{height:26px}
   nav{gap:16px;flex-wrap:wrap;justify-content:center}
   .contact-quick{flex-direction:column;gap:6px}
   .hero{min-height:350px;padding:30px 20px}
