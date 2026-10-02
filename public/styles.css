@@ -42,7 +42,8 @@ a:hover{text-decoration:underline}
   display:flex;
   align-items:center;
   justify-content:space-between;
-  gap:20px;
+  flex-wrap:wrap;
+  gap:12px 20px;
 }
 
 .logo-section{
@@ -56,7 +57,7 @@ a:hover{text-decoration:underline}
 
 .logo{height:56px;width:auto;display:block}
 
-.logo-name{height:36px;width:auto;display:block}
+.logo-name{height:46px;width:auto;display:block}
 
 nav{display:flex;gap:32px;align-items:center}
 
@@ -378,8 +379,8 @@ button:active{
 /* Responsive */
 @media(max-width:768px){
   .header-container{flex-direction:column;gap:12px;padding:10px 20px}
-  .logo{height:44px}
-  .logo-name{height:26px}
+  .logo{height:46px}
+  .logo-name{height:30px}
   nav{gap:16px;flex-wrap:wrap;justify-content:center}
   .contact-quick{flex-direction:column;gap:6px}
   .hero{min-height:350px;padding:30px 20px}
