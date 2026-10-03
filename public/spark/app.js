@@ -21,7 +21,7 @@ async function api(path, method = 'GET', body) {
     method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
   });
   const data = await r.json().catch(() => ({}));
-  if (r.status === 401 && path !== 'auth/login') { me = null; boot(); throw new Error('Signed out'); }
+  if (r.status === 401 && !path.startsWith('auth/') && me) { me = null; boot(); throw new Error('Signed out'); }
   if (!r.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
