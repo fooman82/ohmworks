@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Your job — OHMWORKS</title>
+  <style>
+    *{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,Segoe UI,Arial,sans-serif;background:#f3f5f8;color:#111;overflow-x:hidden}
+    .wrap{max-width:720px;margin:0 auto;padding:14px}.card{background:#fff;border-radius:10px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+    h1{margin:0;font-size:22px}h2{font-size:17px;margin:0 0 8px}.muted{color:#667}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #e3e7ec;text-align:left}.r{text-align:right}
+    input,button{font:inherit;padding:9px 12px;border-radius:7px;border:1px solid #bbb;max-width:100%}button{background:#0b79d0;color:#fff;border:0;font-weight:600;cursor:pointer}button.sec{background:#fff;color:#333;border:1px solid #bbb}
+    .ok{background:#e6f7ef;color:#0a7a4e;padding:8px 12px;border-radius:7px;display:inline-block}canvas{background:#fff;border:1px solid #bbb;border-radius:7px;width:100%;max-width:420px;touch-action:none;display:block;margin:8px 0}
+    .row{display:flex;gap:8px;flex-wrap:wrap}
+    @media print{button,.noprint{display:none!important}body{background:#fff}.card{box-shadow:none}}
+  </style>
+</head>
+<body><div class="wrap" id="root"><div class="card">Loading…</div></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const token = new URLSearchParams(location.search).get('t');
+async function call(action, body) {
+  const r = await fetch(`/api/spark/portal/${encodeURIComponent(token)}${action ? '/' + action : ''}`, { method: body ? 'POST' : 'GET', headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error || 'Error'); return d;
+}
+function pad(canvas) {
+  const ctx = canvas.getContext('2d'); ctx.lineWidth = 2.2; ctx.lineCap = 'round'; let on = false, dirty = false;
+  const p = (e) => { const r = canvas.getBoundingClientRect(), t = e.touches ? e.touches[0] : e; return [(t.clientX - r.left) * canvas.width / r.width, (t.clientY - r.top) * canvas.height / r.height]; };
+  const s = (e) => { on = true; const [x, y] = p(e); ctx.beginPath(); ctx.moveTo(x, y); e.preventDefault(); };
+  const m = (e) => { if (!on) return; const [x, y] = p(e); ctx.lineTo(x, y); ctx.stroke(); dirty = true; e.preventDefault(); };
+  canvas.addEventListener('mousedown', s); canvas.addEventListener('mousemove', m); addEventListener('mouseup', () => (on = false));
+  canvas.addEventListener('touchstart', s, { passive: false }); canvas.addEventListener('touchmove', m, { passive: false }); canvas.addEventListener('touchend', () => (on = false));
+  return { clear() { ctx.clearRect(0, 0, canvas.width, canvas.height); dirty = false; }, empty: () => !dirty,
+    png() { const o = document.createElement('canvas'); o.width = canvas.width; o.height = canvas.height; const c = o.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, o.width, o.height); c.drawImage(canvas, 0, 0); return o.toDataURL('image/png'); } };
+}
+async function load() {
+  let j; try { j = await call(''); } catch { $('#root').innerHTML = '<div class="card"><h1>Link not found</h1><p class="muted">This link is invalid or has expired. Please contact us.</p></div>'; return; }
+  const b = j.business, t = j.totals, inv = j.invoice;
+  const title = inv ? `Tax Invoice ${esc(inv.number)}` : 'Quote';
+  $('#root').innerHTML = `
+  <div class="card"><h1>${esc(b.name)}</h1><div class="muted">ABN ${esc(b.abn)} · Lic ${esc(b.licence)} · ${esc(b.phone)} · ${esc(b.email)}</div></div>
+  <div class="card"><h2>${title}</h2><p>Hi ${esc(j.client_name)},</p><p><b>${esc(j.title)}</b>${j.site_address ? '<br>' + esc(j.site_address) : ''}${j.scheduled_start ? '<br>Scheduled: ' + esc(j.scheduled_start) : ''}</p>
+    ${j.description ? `<p class="muted">${esc(j.description).replace(/\n/g, '<br>')}</p>` : ''}
+    ${j.items.length ? `<table><tr><th>Item</th><th class="r">Qty</th><th class="r">Amount</th></tr>${j.items.map((i) => `<tr><td>${esc(i.description)}</td><td class="r">${i.qty}</td><td class="r">${money(i.qty * i.unit_price)}</td></tr>`).join('')}
+      <tr><td colspan="2" class="r">Subtotal</td><td class="r">${money(t.subtotal)}</td></tr><tr><td colspan="2" class="r">GST</td><td class="r">${money(t.gst)}</td></tr>
+      <tr><td colspan="2" class="r"><b>Total</b></td><td class="r"><b>${money(t.total)}</b></td></tr>
+      ${t.paid ? `<tr><td colspan="2" class="r">Paid</td><td class="r">${money(t.paid)}</td></tr><tr><td colspan="2" class="r"><b>Balance due</b></td><td class="r"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
+    ${inv ? `<p class="muted">Issued ${esc(inv.issued_at)} · Due ${esc(inv.due_at)} ${inv.paid_at ? '· <span class="ok">PAID ' + esc(inv.paid_at) + '</span>' : ''}</p>` : ''}
+    ${j.bank_details && !inv?.paid_at ? `<p><b>How to pay</b><br>${esc(j.bank_details).replace(/\n/g, '<br>')}</p>` : ''}
+    <p class="muted" style="font-size:12px">${esc(j.terms)}</p><button class="sec noprint" onclick="print()">Print / save PDF</button></div>
+  ${!inv && j.items.length ? `<div class="card noprint"><h2>Accept this quote</h2>${j.quote_accepted_at ? `<span class="ok">✓ Accepted by ${esc(j.quote_accepted_name)} on ${esc(j.quote_accepted_at)}</span>` : `
+    <p class="muted">Type your full name to accept the quote and approve the work.</p><div class="row"><input id="an" placeholder="Full name" style="flex:1"><button id="ab">Accept quote</button></div>`}</div>` : ''}
+  <div class="card noprint"><h2>Sign-off</h2>${j.signed_at ? `<span class="ok">✓ Signed by ${esc(j.signed_name)} on ${esc(j.signed_at)}</span>` : `
+    <p class="muted">Once the work is complete you can sign below.</p><canvas id="sg" width="600" height="200"></canvas>
+    <div class="row"><input id="sn" placeholder="Full name" style="flex:1"><button class="sec" id="sc">Clear</button><button id="ss">Sign</button></div>`}</div>`;
+  const ab = $('#ab'); if (ab) ab.onclick = async () => { try { await call('accept', { name: $('#an').value.trim() }); load(); } catch (e) { alert(e.message); } };
+  const sg = $('#sg'); if (sg) { const p = pad(sg); $('#sc').onclick = () => p.clear();
+    $('#ss').onclick = async () => { if (p.empty() || !$('#sn').value.trim()) return alert('Please sign and type your name'); try { await call('sign', { name: $('#sn').value.trim(), signature: p.png() }); load(); } catch (e) { alert(e.message); } }; }
+}
+load();
+</script></body></html>

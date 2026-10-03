@@ -1,4 +1,6 @@
 // SPARK backend API (Cloudflare Pages Function + D1). Mounted at /api/spark/*
+import { handleExtra, handlePortal } from './_extra.js';
+
 const JOB_STATUSES = ['quote', 'work_order', 'completed', 'invoiced', 'paid', 'cancelled'];
 const GST = 0.1;
 
@@ -81,6 +83,9 @@ export async function onRequest({ request, env, params }) {
       }
     }
 
+    // ---------- Public client portal (token protected) ----------
+    if (res === 'portal') return await handlePortal({ env, request, parts, body, json, err });
+
     // ---------- Everything below requires login ----------
     const user = await currentUser(env, request);
     if (!user) return err('Unauthorised', 401);
@@ -91,6 +96,10 @@ export async function onRequest({ request, env, params }) {
       const origin = request.headers.get('origin');
       if (origin && origin !== url.origin) return err('Bad origin', 403);
     }
+
+    // ---------- Phase 2 features ----------
+    const extra = await handleExtra({ env, request, url, parts, body, user, json, err });
+    if (extra) return extra;
 
     // ---------- Dashboard ----------
     if (res === 'dashboard') {

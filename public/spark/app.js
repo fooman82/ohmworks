@@ -30,13 +30,22 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 
 // ---------- Shell ----------
 function shell(active, html) {
-  const links = [['dashboard', 'Dashboard'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['pricelist', 'Price List'], ['staff', 'Staff']];
+  const links = [['dashboard', 'Dashboard'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['pricelist', 'Price List'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['settings', 'Settings']];
   $app.innerHTML = `
     <div class="topbar"><span class="brand">⚡ SPARK</span>
       <nav>${links.map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>
-      <span class="who">${esc(me.name)}</span><button class="sec" id="logout">Sign out</button></div>
+      <input id="gs" placeholder="Search…" style="width:150px"><span class="who">${esc(me.name)}</span><button class="sec" id="logout">Sign out</button></div>
+    <div id="gsr" class="card" style="display:none;position:absolute;right:16px;top:52px;z-index:20;min-width:260px"></div>
     <main>${html}</main>`;
   $('#logout').onclick = () => act(async () => { await api('auth/logout', 'POST'); me = null; boot(); });
+  let gt; $('#gs').oninput = (e) => { clearTimeout(gt); gt = setTimeout(() => act(async () => {
+    const box = $('#gsr'); const q = e.target.value.trim();
+    if (q.length < 3) { box.style.display = 'none'; return; }
+    const r = await api('search?q=' + encodeURIComponent(q));
+    box.innerHTML = [...r.clients.map((c) => `<div><a href="#/client/${c.id}">👤 ${esc(c.name)}</a></div>`), ...r.jobs.map((j) => `<div><a href="#/job/${j.id}">🔧 #${j.id} ${esc(j.title)} <span class="muted">${esc(j.client_name)}</span></a></div>`)].join('') || '<span class="muted">No matches</span>';
+    box.style.display = 'block';
+  }), 300); };
+  document.addEventListener('click', (e) => { const b = $('#gsr'); if (b && !e.target.closest('#gs,#gsr')) b.style.display = 'none'; }, { once: true });
 }
 
 // ---------- Auth ----------
@@ -154,6 +163,7 @@ async function jobPage(id, params) {
   $('#addn').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/notes`, 'POST', formData(e.target)); route(); }); };
   const mk = $('#mkinv'); if (mk) mk.onclick = () => act(async () => { await api(`jobs/${id}/invoice`, 'POST'); route(); });
   const pd = $('#paid'); if (pd) pd.onclick = () => act(async () => { await api(`jobs/${id}/paid`, 'POST'); route(); });
+  if (window.SPARK_X) window.SPARK_X.jobHook(id, j).catch((e) => toast(e.message));
 }
 
 // ---------- Schedule (week view) ----------
@@ -205,7 +215,9 @@ async function route() {
   const params = new URLSearchParams(qs || '');
   const [page, arg] = path.split('/');
   try {
-    if (page === 'jobs') await jobs(params);
+    const X = window.SPARK_X;
+    if (X && X.pages[page]) await X.pages[page](arg, params);
+    else if (page === 'jobs') await jobs(params);
     else if (page === 'job') await jobPage(arg, params);
     else if (page === 'clients') await clients();
     else if (page === 'client') await clientForm(arg);
@@ -227,5 +239,10 @@ async function boot() {
   }
 }
 window.addEventListener('hashchange', route);
-boot();
+window.SPARK = { api, act, esc, money, fmtDT, badge, shell, toast, route, formData, $, me: () => me, STATUSES };
+const xs = document.createElement('script');
+xs.src = '/spark/extras.js';
+xs.onload = boot;
+xs.onerror = boot;
+document.head.appendChild(xs);
 })();
