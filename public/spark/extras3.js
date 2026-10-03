@@ -84,12 +84,15 @@ const FIELDS = {
     abn: ['abn'], notes: ['notes', 'note', 'comments'] } },
   pricelist: { label: 'Price list', required: ['name', 'unit_price'], cols: {
     name: ['name', 'item', 'item_name', 'description', 'product', 'product_name'], unit_price: ['unit_price', 'price', 'sell', 'sell_price', 'price_ex_gst', 'rrp', 'sale_price'],
-    cost: ['cost', 'cost_price', 'buy', 'buy_price', 'purchase_price'], category: ['category', 'group', 'type'], is_labour: ['is_labour', 'labour', 'labor'] } },
+    cost: ['cost', 'cost_price', 'buy', 'buy_price', 'purchase_price'], category: ['category', 'group', 'type'], is_labour: ['is_labour', 'labour', 'labor'],
+    manufacturer: ['manufacturer', 'brand', 'make'], mfr_part_no: ['mfr_part_no', 'manufacturer_part_no', 'manufacturer_part_number', 'mpn', 'mfr_part_number', 'mfr_part'],
+    supplier: ['supplier', 'supplier_name', 'vendor'], supplier_part_no: ['supplier_part_no', 'supplier_part_number', 'supplier_code', 'supplier_sku', 'sku', 'part_number', 'part_no'],
+    supplier_cost: ['supplier_cost', 'supplier_price'], preferred: ['preferred', 'preferred_supplier'], stock_qty: ['stock_qty', 'stock', 'qty', 'quantity', 'qty_on_hand', 'on_hand', 'quantity_on_hand'], track_stock: ['track_stock', 'track'] } },
 };
 const TEMPLATES = {
   clients: 'name,email,phone,address,notes\nJane Citizen,jane@example.com,0412 345 678,"12 Example St, Liverpool NSW",Prefers morning visits\n',
   suppliers: 'name,contact,email,phone,address,abn,notes\nExample Electrical Wholesale,Sam,orders@example.com,02 9999 0000,"1 Trade Rd, Wetherill Park NSW",12 345 678 901,Trade account 1234\n',
-  pricelist: 'name,unit_price,cost,category,is_labour\nDouble power point supply & install,95.00,28.50,Power,\nElectrician labour per hour,110.00,0,Labour,yes\n',
+  pricelist: 'name,unit_price,cost,category,is_labour,manufacturer,mfr_part_no,supplier,supplier_part_no,supplier_cost,preferred,stock_qty\nDouble power point,95.00,28.50,Power,,Clipsal,2025-WE,Example Electrical Wholesale,CL2025,28.50,yes,10\nElectrician labour per hour,110.00,0,Labour,yes,,,,,,,\n',
 };
 
 function parseCSV(text) {

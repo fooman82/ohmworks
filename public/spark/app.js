@@ -144,7 +144,7 @@ async function jobPage(id, params) {
       <tr><td colspan="3" class="right muted">GST (10%)</td><td class="right">${money(j.totals.gst)}</td><td></td></tr>
       <tr><td colspan="3" class="right"><b>Total</b></td><td class="right"><b>${money(j.totals.total)}</b></td><td></td></tr></table></div>
       <form class="row" id="addi" style="margin-top:10px">
-        <select id="pick" class="grow"><option value="">Price list…</option>${pl.map((p) => `<option value="${p.id}" data-n="${esc(p.name)}" data-p="${p.unit_price}">${esc(p.name)} — ${money(p.unit_price)}</option>`).join('')}</select>
+        <input type="hidden" name="item_id"><select id="pick" class="grow"><option value="">Price list…</option>${pl.map((p) => `<option value="${p.id}" data-n="${esc(p.name)}" data-p="${p.unit_price}">${esc(p.name)} — ${money(p.unit_price)}</option>`).join('')}</select>
         <input name="description" placeholder="Description" class="grow" required>
         <input name="qty" type="number" step="0.01" value="1" style="width:80px"><input name="unit_price" type="number" step="0.01" placeholder="Unit $" style="width:100px" required>
         <button>Add</button></form></div>
@@ -171,7 +171,7 @@ async function jobPage(id, params) {
   if (id === 'new') return;
   const del = $('#del'); if (del) del.onclick = () => confirm('Delete this job?') && act(async () => { await api('jobs/' + id, 'DELETE'); location.hash = '#/jobs'; });
   document.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => act(async () => { await api(`jobs/${id}/items/${b.dataset.rm}`, 'DELETE'); route(); })));
-  $('#pick').onchange = (e) => { const o = e.target.selectedOptions[0]; if (o.value) { $('#addi [name=description]').value = o.dataset.n; $('#addi [name=unit_price]').value = o.dataset.p; } };
+  $('#pick').onchange = (e) => { const o = e.target.selectedOptions[0]; $('#addi [name=item_id]').value = o.value; if (o.value) { $('#addi [name=description]').value = o.dataset.n; $('#addi [name=unit_price]').value = o.dataset.p; } };
   $('#addi').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/items`, 'POST', formData(e.target)); route(); }); };
   $('#addn').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/notes`, 'POST', formData(e.target)); route(); }); };
   const mk = $('#mkinv'); if (mk) mk.onclick = () => act(async () => { await api(`jobs/${id}/invoice`, 'POST'); route(); });
@@ -259,7 +259,7 @@ xs.onload = () => {
   // extras3.js builds on extras.js (reports + job page), so it must load second
   const x3 = document.createElement('script');
   x3.src = '/spark/extras3.js';
-  x3.onload = boot; x3.onerror = boot;
+  x3.onload = () => { const x4 = document.createElement('script'); x4.src = '/spark/extras4.js'; x4.onload = boot; x4.onerror = boot; document.head.appendChild(x4); }; x3.onerror = boot;
   document.head.appendChild(x3);
 };
 xs.onerror = boot;

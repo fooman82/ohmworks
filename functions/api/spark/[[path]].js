@@ -1,6 +1,7 @@
 // SPARK backend API (Cloudflare Pages Function + D1). Mounted at /api/spark/*
 import { handleExtra, handlePortal } from './_extra.js';
 import { handlePhase3, portalPay, runReminders } from './_phase3.js';
+import { handleStock, syncStock } from './_stock.js';
 import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
 const JOB_STATUSES = ['quote', 'work_order', 'completed', 'invoiced', 'paid', 'cancelled'];
@@ -114,6 +115,10 @@ export async function onRequest({ request, env, params }) {
       if (origin && origin !== url.origin) return err('Bad origin', 403);
     }
 
+    // ---------- Phase 4: price list, supplier items, stock ----------
+    const p4 = await handleStock({ env, request, url, parts, body, user, json, err });
+    if (p4) return p4;
+
     // ---------- Phase 2 features ----------
     const extra = await handleExtra({ env, request, url, parts, body, user, json, err });
     if (extra) return extra;
@@ -207,10 +212,12 @@ export async function onRequest({ request, env, params }) {
             await env.DB.prepare(
               `UPDATE jobs SET client_id=?,title=?,description=?,site_address=?,status=?,assigned_to=?,scheduled_start=?,scheduled_end=?,updated_at=datetime('now') WHERE id=?`)
               .bind(body.client_id, body.title, body.description || null, body.site_address || null, body.status || 'quote', body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, id).run();
+            await syncStock(env, id, user.id);
             return json({ ok: true });
           }
           if (method === 'DELETE') {
             if (user.role !== 'admin') return err('Admin only', 403);
+            await syncStock(env, id, user.id, true);
             await env.DB.prepare('DELETE FROM jobs WHERE id=?').bind(id).run();
             return json({ ok: true });
           }
@@ -218,6 +225,7 @@ export async function onRequest({ request, env, params }) {
         if (sub === 'status' && method === 'POST') {
           if (!JOB_STATUSES.includes(body.status)) return err('Bad status');
           await env.DB.prepare(`UPDATE jobs SET status=?, updated_at=datetime('now') WHERE id=?`).bind(body.status, id).run();
+          await syncStock(env, id, user.id);
           return json({ ok: true });
         }
         if (sub === 'items') {
@@ -244,11 +252,13 @@ export async function onRequest({ request, env, params }) {
           const number = 'INV-' + String(1000 + n.n);
           await env.DB.prepare(`INSERT INTO invoices (job_id,number,due_at) VALUES (?,?,date('now','+14 days'))`).bind(id, number).run();
           await env.DB.prepare(`UPDATE jobs SET status='invoiced', updated_at=datetime('now') WHERE id=?`).bind(id).run();
+          await syncStock(env, id, user.id);
           return json({ number }, 201);
         }
         if (sub === 'paid' && method === 'POST') {
           await env.DB.prepare(`UPDATE invoices SET paid_at=date('now') WHERE job_id=?`).bind(id).run();
           await env.DB.prepare(`UPDATE jobs SET status='paid', updated_at=datetime('now') WHERE id=?`).bind(id).run();
+          await syncStock(env, id, user.id);
           return json({ ok: true });
         }
       }

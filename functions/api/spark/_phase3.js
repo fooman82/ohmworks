@@ -110,35 +110,16 @@ async function importRows(env, type, rows, update) {
       out.added++;
     }
   } else if (type === 'pricelist') {
-    const ex = (await env.DB.prepare('SELECT id, lower(name) AS n FROM price_list').all()).results;
-    const map = new Map(ex.map((r) => [r.n, r.id]));
-    for (const r of rows) {
-      const name = s1(r.name, 200);
-      if (!name) { fail(r, 'Name is required'); continue; }
-      const price = money(r.unit_price);
-      if (price === null) { fail(r, `Invalid price "${r.unit_price ?? ''}"`); continue; }
-      const cost = r.cost === undefined || r.cost === '' ? 0 : money(r.cost);
-      if (cost === null) { fail(r, `Invalid cost "${r.cost}"`); continue; }
-      const cat = s1(r.category, 80); const labour = truthy(r.is_labour) ? 1 : 0;
-      const hit = map.get(name.toLowerCase());
-      if (hit) {
-        if (update) {
-          stmts.push(env.DB.prepare('UPDATE price_list SET unit_price=?, cost=?, category=COALESCE(?,category), is_labour=? WHERE id=?').bind(price, cost, cat, labour, hit));
-          out.updated++;
-        } else out.skipped++;
-        continue;
-      }
-      map.set(name.toLowerCase(), -1);
-      stmts.push(env.DB.prepare('INSERT INTO price_list (name,unit_price,cost,category,is_labour) VALUES (?,?,?,?,?)').bind(name, price, cost, cat, labour));
-      out.added++;
-    }
+    out.links = 0;
+    await importPriceList(env, rows, update, out, fail, stmts);
   } else throw new Error('Unknown import type');
 
-  if (stmts.length) await env.DB.batch(stmts);
+  if (stmts.length) await runBatches(env, stmts);
   return out;
 }
 
 // ---------------------------------------------------------------- Authenticated routes
+import { importPriceList, runBatches } from './_stock.js';
 export async function handlePhase3({ env, request, url, parts, body, user, json, err }) {
   const method = request.method;
   const [res, id, sub] = parts;
