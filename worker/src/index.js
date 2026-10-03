@@ -7,6 +7,17 @@ const esc = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export default {
+  // Hourly trigger (see wrangler.toml): asks SPARK to send tomorrow's SMS job reminders.
+  // SPARK itself enforces the 8am-7pm Sydney window and de-duplicates, so extra runs are harmless.
+  async scheduled(event, env, ctx) {
+    if (!env.CRON_SECRET || !env.SPARK_URL) return;
+    ctx.waitUntil(
+      fetch(`${env.SPARK_URL}/api/spark/cron/reminders`, { method: 'POST', headers: { 'X-Cron-Secret': env.CRON_SECRET } })
+        .then(async (r) => console.log('SPARK reminders', r.status, (await r.text()).slice(0, 200)))
+        .catch((e) => console.error('SPARK reminders failed', e.message))
+    );
+  },
+
   async fetch(request, env) {
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 

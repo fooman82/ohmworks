@@ -1,5 +1,7 @@
 // SPARK backend API (Cloudflare Pages Function + D1). Mounted at /api/spark/*
 import { handleExtra, handlePortal } from './_extra.js';
+import { handlePhase3, portalPay, runReminders } from './_phase3.js';
+import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
 const JOB_STATUSES = ['quote', 'work_order', 'completed', 'invoiced', 'paid', 'cancelled'];
 const GST = 0.1;
@@ -50,6 +52,20 @@ export async function onRequest({ request, env, params }) {
   const method = request.method;
   const url = new URL(request.url);
   const [res, id, sub, subId] = parts;
+
+  // Routes that must run before the JSON body is consumed or a login is required
+  try {
+    if (res === 'stripe-webhook' && method === 'POST') return await stripeWebhook(env, request); // raw body + signature
+    if (res === 'xero' && id === 'callback' && method === 'GET') return await xeroCallback(env, request, url); // one-time state value
+    if (res === 'cron' && id === 'reminders' && method === 'POST') {
+      const given = request.headers.get('x-cron-secret') || '';
+      if (!env.CRON_SECRET || !safeEqual(given, env.CRON_SECRET)) return err('Unauthorised', 401);
+      return json(await runReminders(env));
+    }
+  } catch (e) {
+    return err('Server error: ' + e.message, 500);
+  }
+
   let body = {};
   if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
     try { body = await request.json(); } catch { body = {}; }
@@ -84,6 +100,7 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ---------- Public client portal (token protected) ----------
+    if (res === 'portal' && parts[2] === 'pay' && method === 'POST') return await portalPay({ env, request, token: parts[1], json, err });
     if (res === 'portal') return await handlePortal({ env, request, parts, body, json, err });
 
     // ---------- Everything below requires login ----------
@@ -100,6 +117,10 @@ export async function onRequest({ request, env, params }) {
     // ---------- Phase 2 features ----------
     const extra = await handleExtra({ env, request, url, parts, body, user, json, err });
     if (extra) return extra;
+
+    // ---------- Phase 3 features ----------
+    const p3 = await handlePhase3({ env, request, url, parts, body, user, json, err });
+    if (p3) return p3;
 
     // ---------- Dashboard ----------
     if (res === 'dashboard') {

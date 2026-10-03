@@ -48,13 +48,16 @@ async function load() {
       <tr><td colspan="2" class="r"><b>Total</b></td><td class="r"><b>${money(t.total)}</b></td></tr>
       ${t.paid ? `<tr><td colspan="2" class="r">Paid</td><td class="r">${money(t.paid)}</td></tr><tr><td colspan="2" class="r"><b>Balance due</b></td><td class="r"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
     ${inv ? `<p class="muted">Issued ${esc(inv.issued_at)} · Due ${esc(inv.due_at)} ${inv.paid_at ? '· <span class="ok">PAID ' + esc(inv.paid_at) + '</span>' : ''}</p>` : ''}
-    ${j.bank_details && !inv?.paid_at ? `<p><b>How to pay</b><br>${esc(j.bank_details).replace(/\n/g, '<br>')}</p>` : ''}
+    ${j.card ? `<div class="noprint" style="margin:10px 0"><button id="paycard" style="font-size:17px;padding:12px 20px">💳 Pay ${money(t.balance)} by card</button><div class="muted" style="font-size:12px;margin-top:4px">Secure payment by Stripe. Your card details are never shared with us.</div></div>` : ''}
+    ${new URLSearchParams(location.search).get('paid') && !inv?.paid_at ? '<p class="ok">Thank you! Your payment is being processed and this page will update shortly.</p>' : ''}
+    ${j.bank_details && !inv?.paid_at ? `<p><b>${j.card ? 'Or pay by bank transfer' : 'How to pay'}</b><br>${esc(j.bank_details).replace(/\n/g, '<br>')}</p>` : ''}
     <p class="muted" style="font-size:12px">${esc(j.terms)}</p><button class="sec noprint" onclick="print()">Print / save PDF</button></div>
   ${!inv && j.items.length ? `<div class="card noprint"><h2>Accept this quote</h2>${j.quote_accepted_at ? `<span class="ok">✓ Accepted by ${esc(j.quote_accepted_name)} on ${esc(j.quote_accepted_at)}</span>` : `
     <p class="muted">Type your full name to accept the quote and approve the work.</p><div class="row"><input id="an" placeholder="Full name" style="flex:1"><button id="ab">Accept quote</button></div>`}</div>` : ''}
   <div class="card noprint"><h2>Sign-off</h2>${j.signed_at ? `<span class="ok">✓ Signed by ${esc(j.signed_name)} on ${esc(j.signed_at)}</span>` : `
     <p class="muted">Once the work is complete you can sign below.</p><canvas id="sg" width="600" height="200"></canvas>
     <div class="row"><input id="sn" placeholder="Full name" style="flex:1"><button class="sec" id="sc">Clear</button><button id="ss">Sign</button></div>`}</div>`;
+  const pc = $('#paycard'); if (pc) pc.onclick = async () => { pc.disabled = true; pc.textContent = 'Opening secure payment…'; try { const r = await call('pay', {}); location.href = r.url; } catch (e) { alert(e.message); pc.disabled = false; pc.textContent = 'Pay by card'; } };
   const ab = $('#ab'); if (ab) ab.onclick = async () => { try { await call('accept', { name: $('#an').value.trim() }); load(); } catch (e) { alert(e.message); } };
   const sg = $('#sg'); if (sg) { const p = pad(sg); $('#sc').onclick = () => p.clear();
     $('#ss').onclick = async () => { if (p.empty() || !$('#sn').value.trim()) return alert('Please sign and type your name'); try { await call('sign', { name: $('#sn').value.trim(), signature: p.png() }); load(); } catch (e) { alert(e.message); } }; }

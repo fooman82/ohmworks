@@ -1,7 +1,7 @@
 // SPARK phase 2 API: settings, photos, checklists, time tracking, payments, signatures,
 // email (Mailgun), client portal, recurring jobs, expenses, reports, search, CSV export.
 const GST = 0.1;
-const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const KINDS = ['quote', 'invoice', 'reminder', 'booking'];
 
 export async function getSettings(env) {
@@ -9,7 +9,7 @@ export async function getSettings(env) {
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
-async function totals(env, jobId) {
+export async function totals(env, jobId) {
   const t = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS s, COALESCE(SUM(qty*cost),0) AS c FROM job_items WHERE job_id=?').bind(jobId).first();
   const p = await env.DB.prepare('SELECT COALESCE(SUM(amount),0) AS p FROM payments WHERE job_id=?').bind(jobId).first();
   const subtotal = r2(t.s), gst = r2(subtotal * GST), total = r2(subtotal + gst);
@@ -112,7 +112,7 @@ export async function runRecurring(env) {
   }
 }
 
-async function syncPaid(env, jobId) {
+export async function syncPaid(env, jobId) {
   const t = await totals(env, jobId);
   const inv = await env.DB.prepare('SELECT * FROM invoices WHERE job_id=?').bind(jobId).first();
   if (!inv) return;
@@ -153,8 +153,10 @@ export async function handlePortal({ env, request, parts, body, json, err }) {
   if (invoice) await env.DB.prepare(`UPDATE invoices SET portal_viewed_at=COALESCE(portal_viewed_at,datetime('now')) WHERE job_id=?`).bind(j.id).run();
   const payments = (await env.DB.prepare('SELECT amount,method,paid_on FROM payments WHERE job_id=? ORDER BY id').bind(j.id).all()).results;
   const { id, ...pub } = j;
+  const tot = await totals(env, j.id);
   return json({
-    ...pub, items, invoice, payments, totals: await totals(env, j.id),
+    ...pub, items, invoice, payments, totals: tot,
+    card: !!(env.STRIPE_SECRET_KEY && invoice && !invoice.paid_at && tot.balance >= 0.5),
     business: { name: s.business_name, abn: s.abn, licence: s.licence, phone: s.phone, email: s.email, address: s.address },
     bank_details: invoice ? s.bank_details : '', terms: invoice ? s.invoice_terms : s.quote_terms,
   });
@@ -269,6 +271,8 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
       ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id)*1.1,2) AS total
       FROM invoices v JOIN jobs j ON j.id=v.job_id JOIN clients c ON c.id=j.client_id ORDER BY v.id`).all()).results;
     else if (id === 'jobs') rows = (await env.DB.prepare('SELECT j.id,j.title,j.status,c.name AS client,j.site_address,j.scheduled_start,j.created_at FROM jobs j JOIN clients c ON c.id=j.client_id ORDER BY j.id').all()).results;
+    else if (id === 'suppliers') rows = (await env.DB.prepare('SELECT id,name,contact,email,phone,address,abn,notes FROM suppliers ORDER BY name').all()).results;
+    else if (id === 'pricelist') rows = (await env.DB.prepare('SELECT name,unit_price,cost,category,is_labour FROM price_list ORDER BY name').all()).results;
     else return err('Unknown export', 404);
     return new Response(csv(rows), { headers: { 'content-type': 'text/csv', 'content-disposition': `attachment; filename="spark-${id}.csv"` } });
   }

@@ -1,6 +1,8 @@
 // Pages Function: validates the form post and forwards it to the ohmworks-contact Worker,
 // which sends the email through Cloudflare Email Routing.
 // Required Pages settings: CONTACT_WORKER_URL (variable), CONTACT_SECRET (secret)
+// Also records the enquiry in SPARK (client + quote-stage job) when the DB binding is present.
+import { createEnquiry } from './spark/_intake.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json' } });
@@ -18,6 +20,13 @@ export async function onRequestPost(context) {
 
     if (!data || !data.name || !data.email || !data.phone || !data.description) {
       return json({ error: 'Name, email, phone, and project description are required' }, 400);
+    }
+
+    // Record the enquiry in SPARK first so it is never lost if email delivery fails. Never blocks the email.
+    try {
+      await createEnquiry(context.env, data);
+    } catch (e) {
+      console.error('SPARK enquiry not recorded', e && e.message);
     }
 
     if (!CONTACT_WORKER_URL || !CONTACT_SECRET) {

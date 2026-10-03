@@ -30,7 +30,7 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 
 // ---------- Shell ----------
 function shell(active, html) {
-  const links = [['dashboard', 'Dashboard'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['pricelist', 'Price List'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['settings', 'Settings']];
+  const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
   $app.innerHTML = `
     <div class="topbar"><span class="brand">⚡ SPARK</span>
       <nav>${links.map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>
@@ -242,7 +242,13 @@ window.addEventListener('hashchange', route);
 window.SPARK = { api, act, esc, money, fmtDT, badge, shell, toast, route, formData, $, me: () => me, STATUSES };
 const xs = document.createElement('script');
 xs.src = '/spark/extras.js';
-xs.onload = boot;
+xs.onload = () => {
+  // extras3.js builds on extras.js (reports + job page), so it must load second
+  const x3 = document.createElement('script');
+  x3.src = '/spark/extras3.js';
+  x3.onload = boot; x3.onerror = boot;
+  document.head.appendChild(x3);
+};
 xs.onerror = boot;
 document.head.appendChild(xs);
 })();

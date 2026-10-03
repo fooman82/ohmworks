@@ -5,7 +5,12 @@ compatibility_date = "2024-09-01"
 # Keep variables/secrets set in the dashboard (e.g. MAILGUN_API_KEY) when deploying
 keep_vars = true
 
+[triggers]
+crons = ["0 * * * *"]
+
 [vars]
+# Base URL of the Pages site; the hourly cron calls it to send SMS reminders
+SPARK_URL = "https://www.ohmworks.com.au"
 # Sender must be on the domain verified in Mailgun (MAILGUN_DOMAIN below)
 FROM_ADDRESS = "OHMWORKS Website <website@ohmworks.com.au>"
 TO_ADDRESS = "glen@ohmworks.com.au"
@@ -17,3 +22,4 @@ MAILGUN_API_BASE = "https://api.mailgun.net"
 # Secrets (set with: wrangler secret put <NAME>)
 #   CONTACT_SECRET     shared with the Pages function
 #   MAILGUN_API_KEY    Mailgun private API key (or a domain sending key)
+#   CRON_SECRET        shared with the Pages project; authorises the hourly SMS reminder run
