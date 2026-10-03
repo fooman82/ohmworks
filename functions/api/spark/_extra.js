@@ -272,7 +272,13 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
       FROM invoices v JOIN jobs j ON j.id=v.job_id JOIN clients c ON c.id=j.client_id ORDER BY v.id`).all()).results;
     else if (id === 'jobs') rows = (await env.DB.prepare('SELECT j.id,j.title,j.status,c.name AS client,j.site_address,j.scheduled_start,j.created_at FROM jobs j JOIN clients c ON c.id=j.client_id ORDER BY j.id').all()).results;
     else if (id === 'suppliers') rows = (await env.DB.prepare('SELECT id,name,contact,email,phone,address,abn,notes FROM suppliers ORDER BY name').all()).results;
-    else if (id === 'pricelist') rows = (await env.DB.prepare('SELECT name,unit_price,cost,category,is_labour FROM price_list ORDER BY name').all()).results;
+    else if (id === 'pricelist') rows = (await env.DB.prepare(
+      `SELECT p.name, p.unit_price, COALESCE(si.cost, p.cost) AS cost, p.category, CASE WHEN p.is_labour=1 THEN 'yes' ELSE '' END AS is_labour,
+        p.manufacturer, p.mfr_part_no, s.name AS supplier, si.supplier_part_no, si.cost AS supplier_cost,
+        CASE WHEN si.preferred=1 THEN 'yes' ELSE '' END AS preferred,
+        CASE WHEN p.track_stock=1 THEN p.stock_qty ELSE '' END AS stock_qty
+       FROM price_list p LEFT JOIN supplier_items si ON si.item_id=p.id LEFT JOIN suppliers s ON s.id=si.supplier_id
+       ORDER BY p.name COLLATE NOCASE, si.preferred DESC, s.name`).all()).results;
     else return err('Unknown export', 404);
     return new Response(csv(rows), { headers: { 'content-type': 'text/csv', 'content-disposition': `attachment; filename="spark-${id}.csv"` } });
   }

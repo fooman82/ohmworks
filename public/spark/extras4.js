@@ -10,7 +10,7 @@ const qty = (n) => String(Math.round((Number(n) || 0) * 1000) / 1000);
 async function pricelist() {
   shell('pricelist', `<h1>Price list</h1>
     <div class="row"><input id="q" class="grow" placeholder="Search name, manufacturer, part number…"><select id="sf"><option value="0">All suppliers</option></select>
-      <label class="row" style="gap:4px"><input type="checkbox" id="so"> Stock items only</label><button onclick="location.hash='#/item/new'">+ New item</button></div>
+      <label class="row" style="gap:4px"><input type="checkbox" id="so"> Stock items only</label><button onclick="location.hash='#/item/new'">+ New item</button><a href="/api/spark/export/pricelist" style="padding:8px">⬇ CSV</a></div>
     <div class="card tablewrap" id="list"></div>`);
   const sups = await api('suppliers');
   $('#sf').innerHTML += sups.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
