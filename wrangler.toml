@@ -1,3 +1,9 @@
 name = "ohmworks"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "./public"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "spark-db"
+database_id = "4dac59e6-6db3-4b86-bbfa-2dada6682720"
+migrations_dir = "migrations"
