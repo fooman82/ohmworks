@@ -119,6 +119,11 @@ async function jobPage(id, params) {
   const [cl, us] = await Promise.all([api('clients'), api('users')]);
   const j = id === 'new' ? { status: 'quote', client_id: params.get('client') || '', items: [], notes: [], totals: { subtotal: 0, gst: 0, total: 0 } } : await api('jobs/' + id);
   const pl = id === 'new' ? [] : await api('pricelist');
+  // New jobs default the site address to the selected client's address
+  if (id === 'new' && !j.site_address && j.client_id) {
+    const pc = cl.find((c) => String(c.id) === String(j.client_id));
+    if (pc && pc.address) j.site_address = pc.address;
+  }
   shell('jobs', `<h1>${id === 'new' ? 'New job' : `Job #${j.id} ${badge(j.status)}`}</h1>
     <div class="card"><form class="form" id="f">
       <label>Client</label><select name="client_id" required><option value="">Select…</option>${cl.map((c) => `<option value="${c.id}" ${String(c.id) === String(j.client_id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
@@ -148,6 +153,14 @@ async function jobPage(id, params) {
     <div class="card"><h2>Notes</h2><form class="row" id="addn"><input name="body" class="grow" placeholder="Add a note" required><button>Add</button></form>
       ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at)} · ${esc(n.user_name || '')}</span><br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
 
+  if (id === 'new') {
+    const addr = $('#f [name=site_address]');
+    let autoFilled = addr.value; // only overwrite while the user hasn't typed their own address
+    $('#f [name=client_id]').onchange = (e) => {
+      const c = cl.find((x) => String(x.id) === e.target.value);
+      if (addr.value === '' || addr.value === autoFilled) { autoFilled = (c && c.address) || ''; addr.value = autoFilled; }
+    };
+  }
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = formData(e.target);
     d.scheduled_start = d.scheduled_start ? d.scheduled_start.replace('T', ' ') : null;
