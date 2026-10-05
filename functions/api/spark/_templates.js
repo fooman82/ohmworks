@@ -31,6 +31,15 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
       await saveItems(env, r.meta.last_row_id, body.items);
       return json({ id: r.meta.last_row_id }, 201);
     }
+    if (id && /^\d+$/.test(id) && sub === 'copy' && method === 'POST') {
+      const t = await env.DB.prepare('SELECT * FROM quote_templates WHERE id=?').bind(id).first();
+      if (!t) return err('Not found', 404);
+      const r = await env.DB.prepare('INSERT INTO quote_templates (name,description,hours) VALUES (?,?,?)')
+        .bind(`${t.name} (copy)`.slice(0, 120), t.description, t.hours).run();
+      await env.DB.prepare('INSERT INTO quote_template_items (template_id,item_id,qty) SELECT ?,item_id,qty FROM quote_template_items WHERE template_id=? ORDER BY id')
+        .bind(r.meta.last_row_id, id).run();
+      return json({ id: r.meta.last_row_id }, 201);
+    }
     if (id && /^\d+$/.test(id) && !sub) {
       if (method === 'GET') {
         const t = await env.DB.prepare('SELECT * FROM quote_templates WHERE id=?').bind(id).first();

@@ -134,7 +134,7 @@ async function template(id) {
     <div class="row" style="margin-top:8px"><select id="tpick" class="grow">${optionsHtml()}</select>
       <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add part</button></div>
     <p class="muted">Prices are not stored in the template. The current sell price is copied onto the quote when you apply it, and never changes afterwards.</p>
-    <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
+    <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="sec" id="copy">Copy template</button><button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
   draw();
   $('#tpick').addEventListener('focus', refreshPicker);
   $('#tpick').addEventListener('mousedown', refreshPicker);
@@ -144,6 +144,7 @@ async function template(id) {
     const d = { ...formData(e.target), items };
     if (isNew) { const r = await api('templates', 'POST', d); location.hash = '#/template/' + r.id; } else { await api('templates/' + id, 'PUT', d); toast('Saved'); }
   }); };
+  const cp = $('#copy'); if (cp) cp.onclick = () => act(async () => { const r = await api(`templates/${id}/copy`, 'POST', {}); toast('Template copied. Edit the copy below.'); location.hash = '#/template/' + r.id; });
   const del = $('#del'); if (del) del.onclick = () => confirm('Delete this template?') && act(async () => { await api('templates/' + id, 'DELETE'); location.hash = '#/templates'; });
 }
 
