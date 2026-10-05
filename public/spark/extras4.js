@@ -106,6 +106,18 @@ async function template(id) {
   const t = isNew ? { items: [], hours: 0 } : await api('templates/' + id);
   const pl = await api('pricelist');
   const items = t.items.map((i) => ({ item_id: i.item_id, qty: i.qty }));
+  const optionsHtml = () => `<option value="">Add part…</option>${pl.filter((p) => !p.is_labour).map((p) => `<option value="${p.id}">${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}`;
+  // Always show the latest price list: refetch whenever the picker is opened
+  let refreshing = false;
+  const refreshPicker = async () => {
+    if (refreshing) return; refreshing = true;
+    try {
+      const fresh = await api('pricelist');
+      const sel = $('#tpick'); if (!sel) return;
+      const keep = sel.value; pl.splice(0, pl.length, ...fresh); sel.innerHTML = optionsHtml(); sel.value = keep;
+      draw();
+    } catch { /* keep the existing list */ } finally { refreshing = false; }
+  };
   const draw = () => {
     $('#tparts').innerHTML = items.length ? `<table><tr><th>Part</th><th class="right">Qty</th><th class="right">Current sell</th><th></th></tr>${items.map((it, n) => {
       const p = pl.find((x) => x.id === it.item_id) || {};
@@ -119,11 +131,14 @@ async function template(id) {
     <label>Description of the work</label><textarea name="description" rows="5">${esc(t.description)}</textarea>
     <label>Hours required</label><input name="hours" type="number" step="0.25" min="0" value="${t.hours}">
     <h3 style="margin-top:12px">Parts required</h3><div class="tablewrap" id="tparts"></div>
-    <div class="row" style="margin-top:8px"><select id="tpick" class="grow"><option value="">Add part…</option>${pl.filter((p) => !p.is_labour).map((p) => `<option value="${p.id}">${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}</select>
+    <div class="row" style="margin-top:8px"><select id="tpick" class="grow">${optionsHtml()}</select>
       <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add part</button></div>
     <p class="muted">Prices are not stored in the template. The current sell price is copied onto the quote when you apply it, and never changes afterwards.</p>
     <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
   draw();
+  $('#tpick').addEventListener('focus', refreshPicker);
+  $('#tpick').addEventListener('mousedown', refreshPicker);
+  window.addEventListener('focus', refreshPicker, { once: true });
   $('#tadd').onclick = () => { const v = Number($('#tpick').value); if (!v) return; const ex = items.find((i) => i.item_id === v); const q = Number($('#tqty').value) || 1; if (ex) ex.qty += q; else items.push({ item_id: v, qty: q }); draw(); };
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = { ...formData(e.target), items };

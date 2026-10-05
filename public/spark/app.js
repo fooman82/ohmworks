@@ -18,7 +18,7 @@ function toast(msg) {
 
 async function api(path, method = 'GET', body) {
   const r = await fetch('/api/spark/' + path, {
-    method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin',
+    method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin', cache: 'no-store',
   });
   const data = await r.json().catch(() => ({}));
   if (r.status === 401 && !path.startsWith('auth/') && me) { me = null; boot(); throw new Error('Signed out'); }
