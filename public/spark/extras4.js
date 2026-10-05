@@ -106,7 +106,7 @@ async function template(id) {
   const t = isNew ? { items: [], hours: 0 } : await api('templates/' + id);
   const pl = await api('pricelist');
   const items = t.items.map((i) => ({ item_id: i.item_id, qty: i.qty }));
-  const optionsHtml = () => `<option value="">Add part…</option>${pl.filter((p) => !p.is_labour).map((p) => `<option value="${p.id}">${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}`;
+  const optionsHtml = () => `<option value="">Add part or labour…</option>${pl.map((p) => `<option value="${p.id}">${p.is_labour ? '⏱ ' : ''}${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}`;
   // Always show the latest price list: refetch whenever the picker is opened
   let refreshing = false;
   const refreshPicker = async () => {
@@ -119,9 +119,9 @@ async function template(id) {
     } catch { /* keep the existing list */ } finally { refreshing = false; }
   };
   const draw = () => {
-    $('#tparts').innerHTML = items.length ? `<table><tr><th>Part</th><th class="right">Qty</th><th class="right">Current sell</th><th></th></tr>${items.map((it, n) => {
+    $('#tparts').innerHTML = items.length ? `<table><tr><th>Part / labour</th><th class="right">Qty / hours</th><th class="right">Current sell</th><th></th></tr>${items.map((it, n) => {
       const p = pl.find((x) => x.id === it.item_id) || {};
-      return `<tr><td>${esc(p.name || 'Removed item')}</td><td class="right"><input type="number" step="0.01" min="0.01" value="${it.qty}" data-q="${n}" style="width:80px"></td><td class="right">${money(p.unit_price)}</td><td><button type="button" class="sec" data-x="${n}">✕</button></td></tr>`;
+      return `<tr><td>${p.is_labour ? '⏱ ' : ''}${esc(p.name || 'Removed item')}</td><td class="right"><input type="number" step="0.01" min="0.01" value="${it.qty}" data-q="${n}" style="width:80px"></td><td class="right">${money(p.unit_price)}</td><td><button type="button" class="sec" data-x="${n}">✕</button></td></tr>`;
     }).join('')}</table>` : '<p class="muted">No parts added.</p>';
     document.querySelectorAll('[data-q]').forEach((i) => (i.onchange = () => { items[i.dataset.q].qty = Number(i.value) || 1; }));
     document.querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => { items.splice(b.dataset.x, 1); draw(); }));
@@ -130,7 +130,7 @@ async function template(id) {
     <label>Template name</label><input name="name" value="${esc(t.name)}" required>
     <label>Description of the work</label><textarea name="description" rows="5">${esc(t.description)}</textarea>
     <label>Hours required</label><input name="hours" type="number" step="0.25" min="0" value="${t.hours}">
-    <h3 style="margin-top:12px">Parts required</h3><div class="tablewrap" id="tparts"></div>
+    <h3 style="margin-top:12px">Parts and labour items</h3><div class="tablewrap" id="tparts"></div>
     <div class="row" style="margin-top:8px"><select id="tpick" class="grow">${optionsHtml()}</select>
       <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add part</button></div>
     <p class="muted">Prices are not stored in the template. The current sell price is copied onto the quote when you apply it, and never changes afterwards.</p>
