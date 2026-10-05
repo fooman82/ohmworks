@@ -1,6 +1,7 @@
 // SPARK backend API (Cloudflare Pages Function + D1). Mounted at /api/spark/*
 import { handleExtra, handlePortal } from './_extra.js';
 import { handlePhase3, portalPay, runReminders } from './_phase3.js';
+import { handleTemplates } from './_templates.js';
 import { handleStock, syncStock } from './_stock.js';
 import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
@@ -116,6 +117,8 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ---------- Phase 4: price list, supplier items, stock ----------
+    const p5 = await handleTemplates({ env, request, parts, body, user, json, err });
+    if (p5) return p5;
     const p4 = await handleStock({ env, request, url, parts, body, user, json, err });
     if (p4) return p4;
 

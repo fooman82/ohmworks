@@ -135,11 +135,13 @@ export async function handlePortal({ env, request, parts, body, json, err }) {
      FROM jobs j JOIN clients c ON c.id=j.client_id WHERE j.portal_token=?`).bind(token).first();
   if (!j) return err('Not found', 404);
   if (request.method === 'POST' && action === 'accept') {
-    if (!body.name) return err('Please type your name to accept');
+    // Signing the quote is acceptance: a drawn signature and a printed name are both required.
+    if (!body.name || !String(body.name).trim()) return err('Please print your name');
+    if (!body.signature || !String(body.signature).startsWith('data:image/png') || body.signature.length > 300000) return err('Please sign the quote');
     if (j.quote_accepted_at) return json({ ok: true });
-    await env.DB.prepare(`UPDATE jobs SET quote_accepted_at=datetime('now'), quote_accepted_name=?, status=CASE WHEN status='quote' THEN 'work_order' ELSE status END, updated_at=datetime('now') WHERE id=?`)
-      .bind(String(body.name).slice(0, 100), j.id).run();
-    await env.DB.prepare('INSERT INTO job_notes (job_id,body) VALUES (?,?)').bind(j.id, `Quote accepted online by ${body.name}`).run();
+    await env.DB.prepare(`UPDATE jobs SET quote_accepted_at=datetime('now'), quote_accepted_name=?, quote_signature=?, status=CASE WHEN status='quote' THEN 'work_order' ELSE status END, updated_at=datetime('now') WHERE id=?`)
+      .bind(String(body.name).trim().slice(0, 100), body.signature, j.id).run();
+    await env.DB.prepare('INSERT INTO job_notes (job_id,body) VALUES (?,?)').bind(j.id, `Quote signed and accepted online by ${String(body.name).trim()}`).run();
     return json({ ok: true });
   }
   if (request.method === 'POST' && action === 'sign') {

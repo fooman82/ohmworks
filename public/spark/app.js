@@ -30,7 +30,7 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 
 // ---------- Shell ----------
 function shell(active, html) {
-  const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
+  const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['templates', 'Quote Templates'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
   $app.innerHTML = `
     <div class="topbar"><span class="brand">⚡ SPARK</span><button class="sec menubtn" id="menubtn" aria-label="Menu">☰ ${esc((links.find(([k]) => k === active) || [0, 'Menu'])[1])}</button>
       <nav id="nav">${links.map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>

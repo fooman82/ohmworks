@@ -94,5 +94,58 @@ async function supplier(id, params) {
   load();
 }
 
-Object.assign(X.pages, { pricelist, item, supplier });
+// ======================================================================= Quote templates
+async function templates() {
+  const rows = await api('templates');
+  shell('templates', `<h1>Quote templates</h1><div class="row"><button onclick="location.hash='#/template/new'">+ New template</button></div>
+    <div class="card tablewrap">${rows.length ? `<table><tr><th>Template</th><th class="right">Parts</th><th class="right">Hours</th></tr>${rows.map((t) => `<tr class="click" onclick="location.hash='#/template/${t.id}'"><td>${esc(t.name)}</td><td class="right">${t.parts}</td><td class="right">${qty(t.hours)}</td></tr>`).join('')}</table>` : '<p class="muted">No templates yet.</p>'}</div>`);
+}
+
+async function template(id) {
+  const isNew = id === 'new';
+  const t = isNew ? { items: [], hours: 0 } : await api('templates/' + id);
+  const pl = await api('pricelist');
+  const items = t.items.map((i) => ({ item_id: i.item_id, qty: i.qty }));
+  const draw = () => {
+    $('#tparts').innerHTML = items.length ? `<table><tr><th>Part</th><th class="right">Qty</th><th class="right">Current sell</th><th></th></tr>${items.map((it, n) => {
+      const p = pl.find((x) => x.id === it.item_id) || {};
+      return `<tr><td>${esc(p.name || 'Removed item')}</td><td class="right"><input type="number" step="0.01" min="0.01" value="${it.qty}" data-q="${n}" style="width:80px"></td><td class="right">${money(p.unit_price)}</td><td><button type="button" class="sec" data-x="${n}">✕</button></td></tr>`;
+    }).join('')}</table>` : '<p class="muted">No parts added.</p>';
+    document.querySelectorAll('[data-q]').forEach((i) => (i.onchange = () => { items[i.dataset.q].qty = Number(i.value) || 1; }));
+    document.querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => { items.splice(b.dataset.x, 1); draw(); }));
+  };
+  shell('templates', `<h1>${isNew ? 'New quote template' : esc(t.name)}</h1><div class="card"><form class="form" id="f">
+    <label>Template name</label><input name="name" value="${esc(t.name)}" required>
+    <label>Description of the work</label><textarea name="description" rows="5">${esc(t.description)}</textarea>
+    <label>Hours required</label><input name="hours" type="number" step="0.25" min="0" value="${t.hours}">
+    <h3 style="margin-top:12px">Parts required</h3><div class="tablewrap" id="tparts"></div>
+    <div class="row" style="margin-top:8px"><select id="tpick" class="grow"><option value="">Add part…</option>${pl.filter((p) => !p.is_labour).map((p) => `<option value="${p.id}">${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}</select>
+      <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add part</button></div>
+    <p class="muted">Prices are not stored in the template. The current sell price is copied onto the quote when you apply it, and never changes afterwards.</p>
+    <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
+  draw();
+  $('#tadd').onclick = () => { const v = Number($('#tpick').value); if (!v) return; const ex = items.find((i) => i.item_id === v); const q = Number($('#tqty').value) || 1; if (ex) ex.qty += q; else items.push({ item_id: v, qty: q }); draw(); };
+  $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
+    const d = { ...formData(e.target), items };
+    if (isNew) { const r = await api('templates', 'POST', d); location.hash = '#/template/' + r.id; } else { await api('templates/' + id, 'PUT', d); toast('Saved'); }
+  }); };
+  const del = $('#del'); if (del) del.onclick = () => confirm('Delete this template?') && act(async () => { await api('templates/' + id, 'DELETE'); location.hash = '#/templates'; });
+}
+
+// Job page: apply a template to a quote that has not been accepted
+const origHook = X.jobHook;
+X.jobHook = async (id, j) => {
+  if (origHook) await origHook(id, j);
+  if (j.status !== 'quote' || j.quote_accepted_at) return;
+  const list = await api('templates');
+  if (!list.length) return;
+  const card = document.createElement('div'); card.className = 'card';
+  card.innerHTML = `<h2>Quote template</h2><div class="row"><select id="tplpick" class="grow"><option value="">Choose a template…</option>${list.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select><button id="tplgo">Apply to quote</button></div>
+    <p class="muted">Adds the work description, parts and labour hours. Parts are priced at today's sell price and stay fixed once added.</p>`;
+  const anchor = [...document.querySelectorAll('main .card')].find((c) => c.querySelector('h2') && c.querySelector('h2').textContent === 'Line items');
+  if (anchor) anchor.before(card); else document.querySelector('main').appendChild(card);
+  $('#tplgo').onclick = () => { const v = $('#tplpick').value; if (v) act(async () => { const r = await api(`jobs/${id}/apply-template`, 'POST', { template_id: v }); toast(`Applied: ${r.parts} part(s)${r.hours ? ', ' + r.hours + ' h labour' : ''}`); S.route(); }); };
+};
+
+Object.assign(X.pages, { pricelist, item, supplier, templates, template });
 })();
