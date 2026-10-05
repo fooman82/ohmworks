@@ -44,4 +44,17 @@ tr.click{cursor:pointer}tr.click:hover{background:#0f1620}
 .cal .day h4{margin:0 0 4px;font-size:12px;color:var(--muted)}
 .cal .ev{display:block;background:#0b2a45;border-radius:4px;padding:2px 5px;margin-bottom:3px;color:#cfe8fb;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:700px){.cal{grid-template-columns:1fr}.cal .day{min-height:0}.topbar{gap:6px}}
+.menubtn{display:none}
+@media(max-width:800px){
+.topbar{padding:8px 12px}
+.brand{font-size:18px}
+.menubtn{display:inline-block;margin-left:auto;order:2}
+.topbar #logout{order:3;padding:6px 10px}
+.topbar .who{display:none}
+.topbar #gs{order:5;flex:1 1 100%;width:100%!important}
+.topbar nav{display:none;order:4;flex:1 1 100%;grid-template-columns:repeat(3,1fr);gap:6px}
+.topbar nav.open{display:grid}
+.topbar nav a{text-align:center;background:var(--panel);padding:10px 4px;font-size:14px}
+#gsr{left:12px!important;right:12px!important;min-width:0!important}
+}
 @media print{.topbar,button,#toast,.noprint{display:none!important}body{background:#fff;color:#000}.card{border:0}}
