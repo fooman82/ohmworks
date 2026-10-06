@@ -10,6 +10,24 @@ const fmtDT = (s) => (s ? new Date(s.replace(' ', 'T')).toLocaleString('en-AU', 
 const badge = (s) => `<span class="badge s-${esc(s)}">${esc(String(s).replace('_', ' '))}</span>`;
 const $ = (sel, root = document) => root.querySelector(sel);
 
+// Any address becomes a Google Maps link (opens directions/search in a new tab; the Maps app on phones)
+const mapsHref = (a) => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(String(a).trim());
+const mapLink = (a) => (a && String(a).trim()
+  ? `<a href="${mapsHref(a)}" target="_blank" rel="noopener noreferrer" title="Open in Google Maps" onclick="event.stopPropagation()">📍 ${esc(a)}</a>` : '');
+// Under every address input show a live "open in Google Maps" link
+function wireAddr(root = document) {
+  root.querySelectorAll('input[name=address],input[name=site_address]').forEach((inp) => {
+    if (inp.dataset.maps) return; inp.dataset.maps = '1';
+    const a = document.createElement('a');
+    a.target = '_blank'; a.rel = 'noopener noreferrer'; a.className = 'maplink'; a.textContent = '📍 Open in Google Maps';
+    const sync = () => { const v = inp.value.trim(); a.style.display = v ? 'inline-block' : 'none'; if (v) a.href = mapsHref(v); };
+    inp.addEventListener('input', sync); inp.addEventListener('change', sync); sync();
+    inp.after(a);
+    // programmatic changes (e.g. job address auto-filled from the client) don't fire events, so re-check shortly
+    setTimeout(sync, 0); const obs = setInterval(() => { if (!document.body.contains(inp)) clearInterval(obs); else sync(); }, 700);
+  });
+}
+
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.display = 'block';
@@ -37,6 +55,7 @@ function shell(active, html) {
       <input id="gs" placeholder="Search…" style="width:150px"><span class="who">${esc(me.name)}</span><button class="sec" id="logout">Sign out</button></div>
     <div id="gsr" class="card" style="display:none;position:absolute;right:16px;top:52px;z-index:20;min-width:260px"></div>
     <main>${html}</main>`;
+  wireAddr($app);
   $('#menubtn').onclick = () => $('#nav').classList.toggle('open');
   $('#logout').onclick = () => act(async () => { await api('auth/logout', 'POST'); me = null; boot(); });
   let gt; $('#gs').oninput = (e) => { clearTimeout(gt); gt = setTimeout(() => act(async () => {
@@ -78,7 +97,7 @@ async function clients() {
   shell('clients', `<h1>Clients</h1><div class="row"><input id="q" class="grow" placeholder="Search name, email, phone, address"><button onclick="location.hash='#/client/new'">+ New client</button></div><div class="card tablewrap" id="list"></div>`);
   const load = () => act(async () => {
     const rows = await api('clients?q=' + encodeURIComponent($('#q').value));
-    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th></tr>${rows.map((c) => `<tr class="click" onclick="location.hash='#/client/${c.id}'"><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td><td>${esc(c.address)}</td></tr>`).join('')}</table>` : '<p class="muted">No clients found.</p>';
+    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th></tr>${rows.map((c) => `<tr class="click" onclick="location.hash='#/client/${c.id}'"><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td><td>${mapLink(c.address)}</td></tr>`).join('')}</table>` : '<p class="muted">No clients found.</p>';
   });
   let t; $('#q').oninput = () => { clearTimeout(t); t = setTimeout(load, 250); };
   load();
@@ -111,7 +130,7 @@ async function jobs(params) {
     <button onclick="location.hash='#/job/new'">+ New job</button></div><div class="card tablewrap" id="list"></div>`);
   $('#st').onchange = (e) => (location.hash = '#/jobs' + (e.target.value ? '?status=' + e.target.value : ''));
   const rows = await api('jobs' + (status ? '?status=' + status : ''));
-  $('#list').innerHTML = rows.length ? `<table><tr><th>#</th><th>Job</th><th>Client</th><th>Status</th><th>Scheduled</th><th>Staff</th></tr>${rows.map((j) => `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td>${j.id}</td><td>${esc(j.title)}</td><td>${esc(j.client_name)}</td><td>${badge(j.status)}</td><td>${fmtDT(j.scheduled_start)}</td><td>${esc(j.assigned_name || '—')}</td></tr>`).join('')}</table>` : '<p class="muted">No jobs.</p>';
+  $('#list').innerHTML = rows.length ? `<table><tr><th>#</th><th>Job</th><th>Client</th><th>Status</th><th>Scheduled</th><th>Staff</th></tr>${rows.map((j) => `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td>${j.id}</td><td>${esc(j.title)}${j.site_address ? `<div style="font-size:12px">${mapLink(j.site_address)}</div>` : ''}</td><td>${esc(j.client_name)}</td><td>${badge(j.status)}</td><td>${fmtDT(j.scheduled_start)}</td><td>${esc(j.assigned_name || '—')}</td></tr>`).join('')}</table>` : '<p class="muted">No jobs.</p>';
 }
 
 const toLocalInput = (s) => (s ? s.replace(' ', 'T').slice(0, 16) : '');
@@ -256,7 +275,7 @@ async function boot() {
   }
 }
 window.addEventListener('hashchange', route);
-window.SPARK = { api, act, esc, money, fmtDT, badge, shell, toast, route, formData, $, me: () => me, STATUSES };
+window.SPARK = { api, act, esc, money, fmtDT, badge, shell, toast, route, formData, $, mapLink, mapsHref, me: () => me, STATUSES };
 const xs = document.createElement('script');
 xs.src = '/spark/extras.js';
 xs.onload = () => {

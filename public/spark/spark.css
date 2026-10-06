@@ -59,3 +59,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#0f1620}
 }
 @media print{.topbar,button,#toast,.noprint{display:none!important}body{background:#fff;color:#000}.card{border:0}}
 a.brand{text-decoration:none}a.brand:hover{opacity:.85}
+.maplink{display:inline-block;margin:2px 0 8px;font-size:13px}td .maplink,td a[title='Open in Google Maps']{white-space:normal}

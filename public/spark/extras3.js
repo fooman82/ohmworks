@@ -51,7 +51,7 @@ async function suppliers() {
     <a href="/api/spark/export/suppliers" style="padding:8px">⬇ CSV</a></div><div class="card tablewrap" id="list"></div>`);
   const load = () => act(async () => {
     const rows = await api('suppliers?q=' + encodeURIComponent($('#q').value));
-    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th></tr>${rows.map((s) => `<tr class="click" onclick="location.hash='#/supplier/${s.id}'"><td>${esc(s.name)}</td><td>${esc(s.contact || '')}</td><td>${esc(s.phone || '')}</td><td>${esc(s.email || '')}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${esc(s.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))} ↗</a>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">No suppliers yet. Add one, or use Import to load a CSV.</p>';
+    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th><th>Address</th></tr>${rows.map((s) => `<tr class="click" onclick="location.hash='#/supplier/${s.id}'"><td>${esc(s.name)}</td><td>${esc(s.contact || '')}</td><td>${esc(s.phone || '')}</td><td>${esc(s.email || '')}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${esc(s.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))} ↗</a>` : ''}</td><td>${S.mapLink(s.address)}</td></tr>`).join('')}</table>` : '<p class="muted">No suppliers yet. Add one, or use Import to load a CSV.</p>';
   });
   let t; $('#q').oninput = () => { clearTimeout(t); t = setTimeout(load, 250); };
   load();
