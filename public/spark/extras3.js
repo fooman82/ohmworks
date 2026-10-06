@@ -51,7 +51,7 @@ async function suppliers() {
     <a href="/api/spark/export/suppliers" style="padding:8px">⬇ CSV</a></div><div class="card tablewrap" id="list"></div>`);
   const load = () => act(async () => {
     const rows = await api('suppliers?q=' + encodeURIComponent($('#q').value));
-    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th></tr>${rows.map((s) => `<tr class="click" onclick="location.hash='#/supplier/${s.id}'"><td>${esc(s.name)}</td><td>${esc(s.contact || '')}</td><td>${esc(s.phone || '')}</td><td>${esc(s.email || '')}</td></tr>`).join('')}</table>` : '<p class="muted">No suppliers yet. Add one, or use Import to load a CSV.</p>';
+    $('#list').innerHTML = rows.length ? `<table><tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Website</th></tr>${rows.map((s) => `<tr class="click" onclick="location.hash='#/supplier/${s.id}'"><td>${esc(s.name)}</td><td>${esc(s.contact || '')}</td><td>${esc(s.phone || '')}</td><td>${esc(s.email || '')}</td><td>${s.url ? `<a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${esc(s.url.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, ''))} ↗</a>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">No suppliers yet. Add one, or use Import to load a CSV.</p>';
   });
   let t; $('#q').oninput = () => { clearTimeout(t); t = setTimeout(load, 250); };
   load();
@@ -62,6 +62,7 @@ async function supplier(id) {
   shell('suppliers', `<h1>${id === 'new' ? 'New supplier' : esc(s.name)}</h1><div class="card"><form class="form" id="f">
     <label>Name</label><input name="name" value="${esc(s.name)}" required><label>Contact person</label><input name="contact" value="${esc(s.contact)}">
     <label>Phone</label><input name="phone" value="${esc(s.phone)}"><label>Email</label><input name="email" type="email" value="${esc(s.email)}">
+    <label>Website</label><input name="url" type="text" inputmode="url" placeholder="https://example.com" value="${esc(s.url)}">${s.url ? `<div><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">Open website ↗</a></div>` : ''}
     <label>Address</label><input name="address" value="${esc(s.address)}"><label>ABN</label><input name="abn" value="${esc(s.abn)}">
     <label>Notes</label><textarea name="notes">${esc(s.notes)}</textarea>
     ${id !== 'new' ? `<p class="muted">Recorded expenses with this supplier: ${s.expense_count} totalling ${money(s.spend)}</p>` : ''}
@@ -81,7 +82,7 @@ const FIELDS = {
   suppliers: { label: 'Suppliers', required: ['name'], cols: {
     name: ['name', 'supplier', 'supplier_name', 'company', 'company_name', 'business_name'], contact: ['contact', 'contact_name', 'contact_person'],
     email: ['email', 'email_address', 'e_mail'], phone: ['phone', 'mobile', 'telephone', 'phone_number'], address: ['address', 'street_address', 'location'],
-    abn: ['abn'], notes: ['notes', 'note', 'comments'] } },
+    url: ['url', 'website', 'web', 'web_site', 'website_url', 'site', 'homepage'], abn: ['abn'], notes: ['notes', 'note', 'comments'] } },
   pricelist: { label: 'Price list', required: ['name', 'unit_price'], cols: {
     name: ['name', 'item', 'item_name', 'description', 'product', 'product_name'], unit_price: ['unit_price', 'price', 'sell', 'sell_price', 'price_ex_gst', 'rrp', 'sale_price'],
     cost: ['cost', 'cost_price', 'buy', 'buy_price', 'purchase_price'], category: ['category', 'group', 'type'], is_labour: ['is_labour', 'labour', 'labor'],

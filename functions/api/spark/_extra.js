@@ -273,7 +273,7 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
       ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id AND on_invoice=1)*1.1,2) AS total
       FROM invoices v JOIN jobs j ON j.id=v.job_id JOIN clients c ON c.id=j.client_id ORDER BY v.id`).all()).results;
     else if (id === 'jobs') rows = (await env.DB.prepare('SELECT j.id,j.title,j.status,c.name AS client,j.site_address,j.scheduled_start,j.created_at FROM jobs j JOIN clients c ON c.id=j.client_id ORDER BY j.id').all()).results;
-    else if (id === 'suppliers') rows = (await env.DB.prepare('SELECT id,name,contact,email,phone,address,abn,notes FROM suppliers ORDER BY name').all()).results;
+    else if (id === 'suppliers') rows = (await env.DB.prepare('SELECT id,name,contact,email,phone,url,address,abn,notes FROM suppliers ORDER BY name').all()).results;
     else if (id === 'pricelist') rows = (await env.DB.prepare(
       `SELECT p.name, p.unit_price, COALESCE(si.cost, p.cost) AS cost, p.category, CASE WHEN p.is_labour=1 THEN 'yes' ELSE '' END AS is_labour,
         p.manufacturer, p.mfr_part_no, s.name AS supplier, si.supplier_part_no, si.cost AS supplier_cost,

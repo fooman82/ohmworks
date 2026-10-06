@@ -59,6 +59,18 @@ export async function portalPay({ env, request, token, json, err }) {
   }
 }
 
+// Website address: blank -> null, "example.com" -> "https://example.com", anything not http(s) -> false (invalid)
+function urlOf(v) {
+  let s = String(v ?? '').trim();
+  if (!s) return null;
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = 'https://' + s;
+  try {
+    const u = new URL(s);
+    if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) return false;
+    return u.href.slice(0, 300);
+  } catch { return false; }
+}
+
 // ---------------------------------------------------------------- CSV import
 async function importRows(env, type, rows, update) {
   const out = { type, added: 0, updated: 0, skipped: 0, errors: [] };
@@ -96,17 +108,19 @@ async function importRows(env, type, rows, update) {
       if (!name) { fail(r, 'Name is required'); continue; }
       const email = s1(r.email, 200);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fail(r, `Invalid email "${email}"`); continue; }
-      const v = [s1(r.contact, 120), email, s1(r.phone, 40), s1(r.address, 300), s1(r.abn, 20), s1(r.notes, 2000)];
+      const url = urlOf(r.url);
+      if (url === false) { fail(r, `Invalid website "${r.url}"`); continue; }
+      const v = [s1(r.contact, 120), email, s1(r.phone, 40), s1(r.address, 300), s1(r.abn, 20), s1(r.notes, 2000), url];
       const hit = map.get(name.toLowerCase());
       if (hit) {
         if (update) {
-          stmts.push(env.DB.prepare(`UPDATE suppliers SET contact=COALESCE(?,contact), email=COALESCE(?,email), phone=COALESCE(?,phone), address=COALESCE(?,address), abn=COALESCE(?,abn), notes=COALESCE(?,notes) WHERE id=?`).bind(...v, hit));
+          stmts.push(env.DB.prepare(`UPDATE suppliers SET contact=COALESCE(?,contact), email=COALESCE(?,email), phone=COALESCE(?,phone), address=COALESCE(?,address), abn=COALESCE(?,abn), notes=COALESCE(?,notes), url=COALESCE(?,url) WHERE id=?`).bind(...v, hit));
           out.updated++;
         } else out.skipped++;
         continue;
       }
       map.set(name.toLowerCase(), -1);
-      stmts.push(env.DB.prepare('INSERT INTO suppliers (name,contact,email,phone,address,abn,notes) VALUES (?,?,?,?,?,?,?)').bind(name, ...v));
+      stmts.push(env.DB.prepare('INSERT INTO suppliers (name,contact,email,phone,address,abn,notes,url) VALUES (?,?,?,?,?,?,?,?)').bind(name, ...v));
       out.added++;
     }
   } else if (type === 'pricelist') {
@@ -133,8 +147,10 @@ export async function handlePhase3({ env, request, url, parts, body, user, json,
     }
     if (!id && method === 'POST') {
       if (!s1(body.name, 120)) return err('Name required');
-      const r = await env.DB.prepare('INSERT INTO suppliers (name,contact,email,phone,address,abn,notes) VALUES (?,?,?,?,?,?,?)')
-        .bind(s1(body.name, 120), s1(body.contact, 120), s1(body.email, 200), s1(body.phone, 40), s1(body.address, 300), s1(body.abn, 20), s1(body.notes, 2000)).run();
+      const url = urlOf(body.url);
+      if (url === false) return err('Website address is not valid. Use something like https://example.com');
+      const r = await env.DB.prepare('INSERT INTO suppliers (name,contact,email,phone,address,abn,notes,url) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(s1(body.name, 120), s1(body.contact, 120), s1(body.email, 200), s1(body.phone, 40), s1(body.address, 300), s1(body.abn, 20), s1(body.notes, 2000), url).run();
       return json({ id: r.meta.last_row_id }, 201);
     }
     if (id && method === 'GET') {
@@ -145,8 +161,10 @@ export async function handlePhase3({ env, request, url, parts, body, user, json,
     }
     if (id && method === 'PUT') {
       if (!s1(body.name, 120)) return err('Name required');
-      await env.DB.prepare('UPDATE suppliers SET name=?,contact=?,email=?,phone=?,address=?,abn=?,notes=? WHERE id=?')
-        .bind(s1(body.name, 120), s1(body.contact, 120), s1(body.email, 200), s1(body.phone, 40), s1(body.address, 300), s1(body.abn, 20), s1(body.notes, 2000), id).run();
+      const url = urlOf(body.url);
+      if (url === false) return err('Website address is not valid. Use something like https://example.com');
+      await env.DB.prepare('UPDATE suppliers SET name=?,contact=?,email=?,phone=?,address=?,abn=?,notes=?,url=? WHERE id=?')
+        .bind(s1(body.name, 120), s1(body.contact, 120), s1(body.email, 200), s1(body.phone, 40), s1(body.address, 300), s1(body.abn, 20), s1(body.notes, 2000), url, id).run();
       return json({ ok: true });
     }
     if (id && method === 'DELETE') {
