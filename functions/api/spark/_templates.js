@@ -9,9 +9,13 @@ async function saveItems(env, tplId, items) {
   for (const it of Array.isArray(items) ? items.slice(0, 100) : []) {
     const q = num(it.qty, 1) || 1;
     if (!Number(it.item_id)) continue;
-    stmts.push(env.DB.prepare('INSERT INTO quote_template_items (template_id,item_id,qty) VALUES (?,?,?)').bind(tplId, Number(it.item_id), q));
+    const hasPrice = it.unit_price !== undefined && it.unit_price !== null && String(it.unit_price).trim() !== '';
+    const price = hasPrice ? Number(it.unit_price) : null;
+    if (hasPrice && !(Number.isFinite(price) && price >= 0)) return 'Sell price override is not valid';
+    stmts.push(env.DB.prepare('INSERT INTO quote_template_items (template_id,item_id,qty,unit_price) VALUES (?,?,?,?)').bind(tplId, Number(it.item_id), q, price === null ? null : Math.round(price * 100) / 100));
   }
   await env.DB.batch(stmts);
+  return null;
 }
 
 export async function handleTemplates({ env, request, parts, body, user, json, err }) {
@@ -28,7 +32,8 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
       if (!name) return err('Name required');
       const r = await env.DB.prepare('INSERT INTO quote_templates (name,description,hours) VALUES (?,?,?)')
         .bind(name, String(body.description || '').slice(0, 4000) || null, num(body.hours)).run();
-      await saveItems(env, r.meta.last_row_id, body.items);
+      const bad = await saveItems(env, r.meta.last_row_id, body.items);
+      if (bad) { await env.DB.prepare('DELETE FROM quote_templates WHERE id=?').bind(r.meta.last_row_id).run(); return err(bad); }
       return json({ id: r.meta.last_row_id }, 201);
     }
     if (id && /^\d+$/.test(id) && sub === 'copy' && method === 'POST') {
@@ -36,7 +41,7 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
       if (!t) return err('Not found', 404);
       const r = await env.DB.prepare('INSERT INTO quote_templates (name,description,hours) VALUES (?,?,?)')
         .bind(`${t.name} (copy)`.slice(0, 120), t.description, t.hours).run();
-      await env.DB.prepare('INSERT INTO quote_template_items (template_id,item_id,qty) SELECT ?,item_id,qty FROM quote_template_items WHERE template_id=? ORDER BY id')
+      await env.DB.prepare('INSERT INTO quote_template_items (template_id,item_id,qty,unit_price) SELECT ?,item_id,qty,unit_price FROM quote_template_items WHERE template_id=? ORDER BY id')
         .bind(r.meta.last_row_id, id).run();
       return json({ id: r.meta.last_row_id }, 201);
     }
@@ -45,7 +50,7 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
         const t = await env.DB.prepare('SELECT * FROM quote_templates WHERE id=?').bind(id).first();
         if (!t) return err('Not found', 404);
         const items = (await env.DB.prepare(
-          `SELECT q.id, q.item_id, q.qty, p.name, p.unit_price, p.manufacturer FROM quote_template_items q JOIN price_list p ON p.id=q.item_id WHERE q.template_id=? ORDER BY q.id`).bind(id).all()).results;
+          `SELECT q.id, q.item_id, q.qty, q.unit_price AS override_price, p.name, p.unit_price, p.manufacturer FROM quote_template_items q JOIN price_list p ON p.id=q.item_id WHERE q.template_id=? ORDER BY q.id`).bind(id).all()).results;
         return json({ ...t, items });
       }
       if (method === 'PUT') {
@@ -53,7 +58,8 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
         if (!name) return err('Name required');
         await env.DB.prepare('UPDATE quote_templates SET name=?,description=?,hours=? WHERE id=?')
           .bind(name, String(body.description || '').slice(0, 4000) || null, num(body.hours), id).run();
-        await saveItems(env, id, body.items);
+        const bad = await saveItems(env, id, body.items);
+        if (bad) return err(bad);
         return json({ ok: true });
       }
       if (method === 'DELETE') {
@@ -71,7 +77,7 @@ export async function handleTemplates({ env, request, parts, body, user, json, e
     const t = await env.DB.prepare('SELECT * FROM quote_templates WHERE id=?').bind(Number(body.template_id)).first();
     if (!t) return err('Template not found');
     const items = (await env.DB.prepare(
-      `SELECT q.qty, p.id, p.name, p.unit_price, p.cost FROM quote_template_items q JOIN price_list p ON p.id=q.item_id WHERE q.template_id=? ORDER BY q.id`).bind(t.id).all()).results;
+      `SELECT q.qty, p.id, p.name, COALESCE(q.unit_price, p.unit_price) AS unit_price, p.cost FROM quote_template_items q JOIN price_list p ON p.id=q.item_id WHERE q.template_id=? ORDER BY q.id`).bind(t.id).all()).results;
     const stmts = [];
     if (t.description) {
       const desc = job.description ? job.description + '\n\n' + t.description : t.description;
