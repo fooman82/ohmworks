@@ -32,8 +32,8 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 function shell(active, html) {
   const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['invoices', 'Invoices'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['templates', 'Quote Templates'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
   $app.innerHTML = `
-    <div class="topbar"><span class="brand">⚡ SPARK</span><button class="sec menubtn" id="menubtn" aria-label="Menu">☰ ${esc((links.find(([k]) => k === active) || [0, 'Menu'])[1])}</button>
-      <nav id="nav">${links.map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>
+    <div class="topbar"><a class="brand" href="#/dashboard" title="Dashboard">⚡ SPARK</a><button class="sec menubtn" id="menubtn" aria-label="Menu">☰ ${esc((links.find(([k]) => k === active) || [0, 'Menu'])[1])}</button>
+      <nav id="nav">${links.filter(([k]) => k !== 'dashboard').map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>
       <input id="gs" placeholder="Search…" style="width:150px"><span class="who">${esc(me.name)}</span><button class="sec" id="logout">Sign out</button></div>
     <div id="gsr" class="card" style="display:none;position:absolute;right:16px;top:52px;z-index:20;min-width:260px"></div>
     <main>${html}</main>`;

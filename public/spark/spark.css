@@ -58,3 +58,4 @@ tr.click{cursor:pointer}tr.click:hover{background:#0f1620}
 #gsr{left:12px!important;right:12px!important;min-width:0!important}
 }
 @media print{.topbar,button,#toast,.noprint{display:none!important}body{background:#fff;color:#000}.card{border:0}}
+a.brand{text-decoration:none}a.brand:hover{opacity:.85}
