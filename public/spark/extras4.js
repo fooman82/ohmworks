@@ -132,7 +132,14 @@ async function template(id) {
     <label>Hours required</label><input name="hours" type="number" step="0.25" min="0" value="${t.hours}">
     <h3 style="margin-top:12px">Parts and labour items</h3><div class="tablewrap" id="tparts"></div>
     <div class="row" style="margin-top:8px"><select id="tpick" class="grow">${optionsHtml()}</select>
-      <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add part</button></div>
+      <input id="tqty" type="number" step="0.01" min="0.01" value="1" style="width:80px"><button type="button" class="sec" id="tadd">Add</button>
+      <button type="button" class="sec" id="tnew">+ New item</button></div>
+    <div id="npanel" class="card" style="display:none;margin-top:8px"><h4 style="margin:0 0 8px">New price list item</h4>
+      <div class="row"><input id="n_name" class="grow" placeholder="Item name"><input id="n_mfr" placeholder="Manufacturer" style="width:150px"></div>
+      <div class="row" style="margin-top:6px"><input id="n_price" type="number" step="0.01" min="0" placeholder="Sell price ex GST" style="width:150px"><input id="n_cost" type="number" step="0.01" min="0" placeholder="Cost ex GST" style="width:130px">
+        <label class="row" style="gap:4px"><input type="checkbox" id="n_lab"> Labour</label></div>
+      <div class="row" style="margin-top:8px"><button type="button" id="n_save">Create and add to template</button><button type="button" class="sec" id="n_cancel">Cancel</button></div>
+      <p class="muted" style="margin:6px 0 0">The item is saved to the price list and added using the quantity above. Add suppliers and part numbers later from the Price list.</p></div>
     <p class="muted">Prices are not stored in the template. The current sell price is copied onto the quote when you apply it, and never changes afterwards.</p>
     <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="sec" id="copy">Copy template</button><button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
   draw();
@@ -140,6 +147,29 @@ async function template(id) {
   $('#tpick').addEventListener('mousedown', refreshPicker);
   window.addEventListener('focus', refreshPicker, { once: true });
   $('#tadd').onclick = () => { const v = Number($('#tpick').value); if (!v) return; const ex = items.find((i) => i.item_id === v); const q = Number($('#tqty').value) || 1; if (ex) ex.qty += q; else items.push({ item_id: v, qty: q }); draw(); };
+  // Create a new price list item without leaving the template
+  const panel = $('#npanel');
+  $('#tnew').onclick = () => { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; if (panel.style.display === 'block') $('#n_name').focus(); };
+  $('#n_cancel').onclick = () => { panel.style.display = 'none'; };
+  const createItem = () => act(async () => {
+    const name = $('#n_name').value.trim();
+    if (!name) { toast('Enter an item name'); return; }
+    if ($('#n_price').value === '') { toast('Enter a sell price'); return; }
+    const r = await api('pricelist', 'POST', {
+      name, manufacturer: $('#n_mfr').value, unit_price: $('#n_price').value, cost: $('#n_cost').value || 0,
+      is_labour: $('#n_lab').checked ? 1 : 0, track_stock: 0,
+    });
+    const fresh = await api('pricelist');
+    pl.splice(0, pl.length, ...fresh);
+    $('#tpick').innerHTML = optionsHtml();
+    items.push({ item_id: r.id, qty: Number($('#tqty').value) || 1 });
+    draw();
+    ['n_name', 'n_mfr', 'n_price', 'n_cost'].forEach((k) => ($('#' + k).value = '')); $('#n_lab').checked = false;
+    panel.style.display = 'none';
+    toast(`"${name}" added to the price list and this template`);
+  });
+  $('#n_save').onclick = createItem;
+  panel.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); createItem(); } });
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = { ...formData(e.target), items };
     if (isNew) { const r = await api('templates', 'POST', d); location.hash = '#/template/' + r.id; } else { await api('templates/' + id, 'PUT', d); toast('Saved'); }
