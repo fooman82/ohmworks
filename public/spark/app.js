@@ -198,7 +198,7 @@ async function jobPage(id, params) {
     <div class="card"><h2>Invoice</h2>${j.invoice ? `<p><b>${esc(j.invoice.number)}</b> issued ${esc(j.invoice.issued_at)}, due ${esc(j.invoice.due_at)} ${j.invoice.paid_at ? badge('paid') : ''}</p>` : '<p class="muted">Not invoiced yet. Tick the parts and labour to include on the invoice.</p>' + (j.items.length ? '<div class="tablewrap"><table>' + j.items.map((i) => `<tr><td style="width:30px"><input type="checkbox" class="invsel" value="${i.id}" checked></td><td>${esc(i.description)}</td><td class="right">${i.qty}</td><td class="right">${money(i.qty * i.unit_price)}</td></tr>`).join('') + '</table></div><p class="muted" id="invsum"></p>' : '')}
       <div class="row">${!j.invoice ? '<button id="mkinv">Create invoice</button>' : ''}${j.invoice && me.role === 'admin' ? '<button class="bad" id="delinv">Delete invoice</button>' : ''}${j.invoice && !j.invoice.paid_at ? '<button class="ok" id="paid">Mark paid</button>' : ''}${j.invoice ? '<button class="sec" onclick="window.print()">Print / Save PDF</button>' : ''}</div></div>
     <div class="card"><h2>Notes</h2><form class="row" id="addn"><input name="body" class="grow" placeholder="Add a note" required><button>Add</button></form>
-      ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at)} · ${esc(n.user_name || '')}</span><br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
+      ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at + 'Z')} · ${esc(n.user_name || '')}</span><br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
 
   if (id === 'new') {
     const addr = $('#f [name=site_address]');

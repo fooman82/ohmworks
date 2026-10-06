@@ -53,8 +53,8 @@ async function jobHook(id) {
     <div class="row"><button data-mail="quote">✉ Email quote</button><button data-mail="booking" class="sec">✉ Booking confirmation</button>
       <button data-mail="invoice" class="sec">✉ Email invoice</button><button data-mail="reminder" class="sec">✉ Payment reminder</button>
       <button class="sec" id="portal">🔗 Copy client link</button><button class="sec" id="clone">⎘ Duplicate job</button></div>
-    ${x.quote_accepted_at ? `<p>✅ Quote accepted by <b>${esc(x.quote_accepted_name)}</b> on ${fmtDT(x.quote_accepted_at)}</p>` : ''}
-    ${x.emails.length ? `<details><summary class="muted">Email history (${x.emails.length})</summary>${x.emails.map((m) => `<div class="muted">${fmtDT(m.created_at)} · ${esc(m.kind)} → ${esc(m.to_addr)} ${m.ok ? '✓' : '✗ ' + esc(m.detail)}</div>`).join('')}</details>` : ''}</div>
+    ${x.quote_accepted_at ? `<p>✅ Quote accepted by <b>${esc(x.quote_accepted_name)}</b> on ${fmtDT(x.quote_accepted_at + 'Z')}</p>` : ''}
+    ${x.emails.length ? `<details><summary class="muted">Email history (${x.emails.length})</summary>${x.emails.map((m) => `<div class="muted">${fmtDT(m.created_at + 'Z')} · ${esc(m.kind)} → ${esc(m.to_addr)} ${m.ok ? '✓' : '✗ ' + esc(m.detail)}</div>`).join('')}</details>` : ''}</div>
 
   <div class="card"><h2>Payments</h2>
     <div class="muted">Total ${money(x.totals.total)} · Paid ${money(x.totals.paid)} · <b>Balance ${money(x.totals.balance)}</b>${x.totals.cost ? ` · Est. margin ${money(x.totals.subtotal - x.totals.cost)}` : ''}</div>
@@ -65,7 +65,7 @@ async function jobHook(id) {
 
   <div class="card"><h2>Time &amp; check-in</h2>
     <div class="row">${running ? '<button class="bad" id="tstop">■ Stop timer</button>' : '<button id="tstart">▶ Start timer</button>'}
-      <button class="sec" id="checkin">📍 Check in${x.checkin_at ? ' (' + fmtDT(x.checkin_at) + ')' : ''}</button>
+      <button class="sec" id="checkin">📍 Check in${x.checkin_at ? ' (' + fmtDT(x.checkin_at + 'Z') + ')' : ''}</button>
       <button class="sec" id="tbill">Bill hours to job</button><span class="muted">Logged: ${totalHrs.toFixed(2)} h</span></div>
     <div class="tablewrap"><table>${x.time.map((t) => `<tr><td>${esc(t.user_name)}</td><td>${fmtDT(t.started_at + 'Z')}</td><td>${t.ended_at ? hoursOf(t).toFixed(2) + ' h' : '<b>running…</b>'}</td><td><button class="sec" data-deltime="${t.id}">✕</button></td></tr>`).join('')}</table></div>
     <details><summary class="muted">Add time manually</summary><form class="row" id="mtime" style="margin-top:8px"><input type="datetime-local" name="s" required><input type="datetime-local" name="e" required><button>Add</button></form></details></div>
@@ -79,7 +79,7 @@ async function jobHook(id) {
     <div id="photos" class="grid" style="margin-top:8px">${x.photos.map((p) => `<div><img data-ph="${p.id}" style="width:100%;border-radius:6px;cursor:pointer" alt=""><div class="muted">${esc(p.caption || '')} <a data-delph="${p.id}">delete</a></div></div>`).join('')}</div></div>
 
   <div class="card"><h2>Customer sign-off</h2>
-    ${x.signed_at ? `<p>Signed by <b>${esc(x.signed_name)}</b> on ${fmtDT(x.signed_at)}</p><img id="sigimg" style="background:#fff;max-width:320px;border-radius:6px" alt="">` : '<p class="muted">No signature captured.</p>'}
+    ${x.signed_at ? `<p>Signed by <b>${esc(x.signed_name)}</b> on ${fmtDT(x.signed_at + 'Z')}</p><img id="sigimg" style="background:#fff;max-width:320px;border-radius:6px" alt="">` : '<p class="muted">No signature captured.</p>'}
     <details ${x.signed_at ? '' : 'open'}><summary class="muted">${x.signed_at ? 'Capture again' : 'Capture signature'}</summary>
       <canvas id="sig" width="600" height="200" style="background:#fff;border-radius:6px;width:100%;max-width:420px;touch-action:none;display:block;margin:8px 0"></canvas>
       <div class="row"><input id="sname" placeholder="Customer name" class="grow"><button class="sec" id="sclear">Clear</button><button id="ssave">Save signature</button></div></details></div>

@@ -56,7 +56,7 @@ async function item(id) {
     <div class="card"><h2>Stock on hand: ${p.track_stock ? `<b>${qty(p.stock_qty)}</b>` : '<span class="muted">not tracked</span>'}</h2>
       <form class="row" id="adj"><select name="mode"><option value="adjust">Add / remove (+/−)</option><option value="set">Set count to</option></select>
         <input name="qty" type="number" step="0.001" placeholder="Quantity" style="width:120px" required><input name="reason" class="grow" placeholder="Reason (e.g. received order, stocktake)"><button>Update stock</button></form>
-      ${p.moves.length ? `<div class="tablewrap"><table><tr><th>When</th><th class="right">Change</th><th class="right">After</th><th>Reason</th><th>By</th></tr>${p.moves.map((m) => `<tr><td>${fmtDT(m.created_at)}</td><td class="right">${m.delta > 0 ? '+' : ''}${qty(m.delta)}</td><td class="right">${qty(m.qty_after)}</td><td>${esc(m.reason || '')}</td><td>${esc(m.user_name || '')}</td></tr>`).join('')}</table></div>` : ''}</div>`}`);
+      ${p.moves.length ? `<div class="tablewrap"><table><tr><th>When</th><th class="right">Change</th><th class="right">After</th><th>Reason</th><th>By</th></tr>${p.moves.map((m) => `<tr><td>${fmtDT(m.created_at + 'Z')}</td><td class="right">${m.delta > 0 ? '+' : ''}${qty(m.delta)}</td><td class="right">${qty(m.qty_after)}</td><td>${esc(m.reason || '')}</td><td>${esc(m.user_name || '')}</td></tr>`).join('')}</table></div>` : ''}</div>`}`);
 
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = formData(e.target); d.is_labour = e.target.is_labour.checked ? 1 : 0; d.track_stock = e.target.track_stock.checked ? 1 : 0;
