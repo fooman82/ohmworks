@@ -10,7 +10,7 @@ export async function getSettings(env) {
 }
 
 export async function totals(env, jobId) {
-  const t = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS s, COALESCE(SUM(qty*cost),0) AS c FROM job_items WHERE job_id=?').bind(jobId).first();
+  const t = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS s, COALESCE(SUM(qty*cost),0) AS c FROM job_items WHERE job_id=? AND on_invoice=1').bind(jobId).first();
   const p = await env.DB.prepare('SELECT COALESCE(SUM(amount),0) AS p FROM payments WHERE job_id=?').bind(jobId).first();
   const subtotal = r2(t.s), gst = r2(subtotal * GST), total = r2(subtotal + gst);
   return { subtotal, gst, total, cost: r2(t.c), paid: r2(p.p), balance: r2(total - p.p) };
@@ -150,7 +150,7 @@ export async function handlePortal({ env, request, parts, body, json, err }) {
     return json({ ok: true });
   }
   const s = await getSettings(env);
-  const items = (await env.DB.prepare('SELECT description,qty,unit_price FROM job_items WHERE job_id=? ORDER BY id').bind(j.id).all()).results;
+  const items = (await env.DB.prepare('SELECT description,qty,unit_price FROM job_items WHERE job_id=? AND on_invoice=1 ORDER BY id').bind(j.id).all()).results;
   const invoice = await env.DB.prepare('SELECT number,issued_at,due_at,paid_at FROM invoices WHERE job_id=?').bind(j.id).first();
   if (invoice) await env.DB.prepare(`UPDATE invoices SET portal_viewed_at=COALESCE(portal_viewed_at,datetime('now')) WHERE job_id=?`).bind(j.id).run();
   const payments = (await env.DB.prepare('SELECT amount,method,paid_on FROM payments WHERE job_id=? ORDER BY id').bind(j.id).all()).results;
@@ -240,11 +240,11 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
     const to = url.searchParams.get('to') || new Date().toISOString().slice(0, 10);
     const rev = await env.DB.prepare('SELECT COALESCE(SUM(amount),0) AS v, COUNT(*) AS n FROM payments WHERE paid_on BETWEEN ? AND ?').bind(from, to).first();
     const exp = await env.DB.prepare('SELECT COALESCE(SUM(amount),0) AS v FROM expenses WHERE spent_on BETWEEN ? AND ?').bind(from, to).first();
-    const invoiced = await env.DB.prepare(`SELECT COALESCE(SUM(i.qty*i.unit_price),0)*1.1 AS v FROM job_items i JOIN invoices v ON v.job_id=i.job_id WHERE v.issued_at BETWEEN ? AND ?`).bind(from, to).first();
+    const invoiced = await env.DB.prepare(`SELECT COALESCE(SUM(i.qty*i.unit_price),0)*1.1 AS v FROM job_items i JOIN invoices v ON v.job_id=i.job_id WHERE i.on_invoice=1 AND v.issued_at BETWEEN ? AND ?`).bind(from, to).first();
     const aging = (await env.DB.prepare(
       `SELECT j.id, j.title, c.name AS client_name, v.number, v.due_at,
         CAST(julianday('now')-julianday(v.due_at) AS INTEGER) AS days_over,
-        (SELECT COALESCE(SUM(qty*unit_price),0)*1.1 FROM job_items WHERE job_id=j.id) - (SELECT COALESCE(SUM(amount),0) FROM payments WHERE job_id=j.id) AS balance
+        (SELECT COALESCE(SUM(qty*unit_price),0)*1.1 FROM job_items WHERE job_id=j.id AND on_invoice=1) - (SELECT COALESCE(SUM(amount),0) FROM payments WHERE job_id=j.id) AS balance
        FROM invoices v JOIN jobs j ON j.id=v.job_id JOIN clients c ON c.id=j.client_id WHERE v.paid_at IS NULL ORDER BY v.due_at`).all()).results
       .map((a) => ({ ...a, balance: r2(a.balance) })).filter((a) => a.balance > 0.004);
     const hours = (await env.DB.prepare(
@@ -269,8 +269,8 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
     let rows = [];
     if (id === 'clients') rows = (await env.DB.prepare('SELECT id,name,email,phone,address,notes,created_at FROM clients ORDER BY name').all()).results;
     else if (id === 'invoices') rows = (await env.DB.prepare(`SELECT v.number,v.issued_at,v.due_at,v.paid_at,c.name AS client,j.title,
-      ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id),2) AS subtotal,
-      ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id)*1.1,2) AS total
+      ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id AND on_invoice=1),2) AS subtotal,
+      ROUND((SELECT COALESCE(SUM(qty*unit_price),0) FROM job_items WHERE job_id=j.id AND on_invoice=1)*1.1,2) AS total
       FROM invoices v JOIN jobs j ON j.id=v.job_id JOIN clients c ON c.id=j.client_id ORDER BY v.id`).all()).results;
     else if (id === 'jobs') rows = (await env.DB.prepare('SELECT j.id,j.title,j.status,c.name AS client,j.site_address,j.scheduled_start,j.created_at FROM jobs j JOIN clients c ON c.id=j.client_id ORDER BY j.id').all()).results;
     else if (id === 'suppliers') rows = (await env.DB.prepare('SELECT id,name,contact,email,phone,address,abn,notes FROM suppliers ORDER BY name').all()).results;

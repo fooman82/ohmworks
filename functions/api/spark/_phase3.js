@@ -253,10 +253,10 @@ export async function handlePhase3({ env, request, url, parts, body, user, json,
       FROM jobs WHERE status!='cancelled' AND created_at >= datetime('now','-90 days')`).first();
     const byCategory = (await env.DB.prepare(
       `SELECT COALESCE(j.category,'Uncategorised') AS category, COUNT(DISTINCT j.id) AS jobs, ROUND(COALESCE(SUM(i.qty*i.unit_price),0),2) AS revenue_ex_gst
-       FROM jobs j LEFT JOIN job_items i ON i.job_id=j.id WHERE j.status IN ('completed','invoiced','paid') GROUP BY category ORDER BY revenue_ex_gst DESC LIMIT 12`).all()).results;
+       FROM jobs j LEFT JOIN job_items i ON i.job_id=j.id AND i.on_invoice=1 WHERE j.status IN ('completed','invoiced','paid') GROUP BY category ORDER BY revenue_ex_gst DESC LIMIT 12`).all()).results;
     const profit = (await env.DB.prepare(
       `SELECT j.id, j.title, c.name AS client_name,
-         ROUND(COALESCE((SELECT SUM(qty*unit_price) FROM job_items WHERE job_id=j.id),0),2) AS revenue,
+         ROUND(COALESCE((SELECT SUM(qty*unit_price) FROM job_items WHERE job_id=j.id AND on_invoice=1),0),2) AS revenue,
          ROUND(COALESCE((SELECT SUM(qty*cost) FROM job_items WHERE job_id=j.id),0) + COALESCE((SELECT SUM(amount)/1.1 FROM expenses WHERE job_id=j.id),0),2) AS costs
        FROM jobs j JOIN clients c ON c.id=j.client_id WHERE j.status IN ('completed','invoiced','paid') ORDER BY j.id DESC LIMIT 15`).all()).results
       .map((p) => ({ ...p, margin: r2(p.revenue - p.costs) }));

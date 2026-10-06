@@ -42,7 +42,7 @@ async function createSession(env, userId) {
 const pick = (o, keys) => keys.map((k) => (o[k] === undefined || o[k] === '' ? null : o[k]));
 
 async function jobTotals(env, jobId) {
-  const r = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS subtotal FROM job_items WHERE job_id = ?').bind(jobId).first();
+  const r = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS subtotal FROM job_items WHERE job_id = ? AND on_invoice = 1').bind(jobId).first();
   const subtotal = Math.round(r.subtotal * 100) / 100;
   const gst = Math.round(subtotal * GST * 100) / 100;
   return { subtotal, gst, total: Math.round((subtotal + gst) * 100) / 100 };
@@ -137,7 +137,7 @@ export async function onRequest({ request, env, params }) {
         `SELECT j.id, j.title, j.scheduled_start, j.status, c.name AS client_name FROM jobs j JOIN clients c ON c.id = j.client_id
          WHERE date(j.scheduled_start) = date('now','localtime') AND j.status NOT IN ('cancelled','paid') ORDER BY j.scheduled_start`).all();
       const unpaid = await env.DB.prepare(
-        `SELECT COALESCE(SUM(i.qty*i.unit_price),0)*1.1 AS amt FROM job_items i JOIN jobs j ON j.id=i.job_id WHERE j.status='invoiced'`).first();
+        `SELECT COALESCE(SUM(i.qty*i.unit_price),0)*1.1 AS amt FROM job_items i JOIN jobs j ON j.id=i.job_id WHERE j.status='invoiced' AND i.on_invoice=1`).first();
       return json({ counts: counts.results, today: today.results, outstanding: Math.round(unpaid.amt * 100) / 100 });
     }
 
@@ -251,12 +251,35 @@ export async function onRequest({ request, env, params }) {
         if (sub === 'invoice' && method === 'POST') {
           const existing = await env.DB.prepare('SELECT * FROM invoices WHERE job_id=?').bind(id).first();
           if (existing) return json(existing);
+          // Only the lines the user ticked are invoiced; the rest stay on the job but are left off the invoice
+          const all = (await env.DB.prepare('SELECT id FROM job_items WHERE job_id=?').bind(id).all()).results.map((r) => r.id);
+          const chosen = Array.isArray(body.item_ids) ? body.item_ids.map(Number).filter((n) => all.includes(n)) : all;
+          if (!chosen.length) return err('Select at least one item to invoice');
           const n = await env.DB.prepare('SELECT COALESCE(MAX(id),0)+1 AS n FROM invoices').first();
           const number = 'INV-' + String(1000 + n.n);
-          await env.DB.prepare(`INSERT INTO invoices (job_id,number,due_at) VALUES (?,?,date('now','+14 days'))`).bind(id, number).run();
-          await env.DB.prepare(`UPDATE jobs SET status='invoiced', updated_at=datetime('now') WHERE id=?`).bind(id).run();
+          await env.DB.batch([
+            env.DB.prepare('UPDATE job_items SET on_invoice = CASE WHEN id IN (' + chosen.map(() => '?').join(',') + ') THEN 1 ELSE 0 END WHERE job_id=?').bind(...chosen, id),
+            env.DB.prepare(`INSERT INTO invoices (job_id,number,due_at) VALUES (?,?,date('now','+14 days'))`).bind(id, number),
+            env.DB.prepare(`UPDATE jobs SET status='invoiced', updated_at=datetime('now') WHERE id=?`).bind(id),
+          ]);
           await syncStock(env, id, user.id);
           return json({ number }, 201);
+        }
+        if (sub === 'invoice' && method === 'DELETE') {
+          if (user.role !== 'admin') return err('Admin only', 403);
+          const inv = await env.DB.prepare('SELECT * FROM invoices WHERE job_id=?').bind(id).first();
+          if (!inv) return json({ ok: true });
+          if (inv.xero_invoice_id) return err('This invoice has been sent to Xero. Void it in Xero first, then delete it here.', 409);
+          const pay = await env.DB.prepare('SELECT COUNT(*) AS n FROM payments WHERE job_id=?').bind(id).first();
+          if (pay.n) return err('Payments are recorded against this job. Remove them before deleting the invoice.', 409);
+          await env.DB.batch([
+            env.DB.prepare('DELETE FROM invoices WHERE job_id=?').bind(id),
+            env.DB.prepare('UPDATE job_items SET on_invoice=1 WHERE job_id=?').bind(id),
+            env.DB.prepare(`UPDATE jobs SET status='completed', updated_at=datetime('now') WHERE id=?`).bind(id),
+            env.DB.prepare('INSERT INTO job_notes (job_id,user_id,body) VALUES (?,?,?)').bind(id, user.id, `Invoice ${inv.number} deleted`),
+          ]);
+          await syncStock(env, id, user.id);
+          return json({ ok: true });
         }
         if (sub === 'paid' && method === 'POST') {
           await env.DB.prepare(`UPDATE invoices SET paid_at=date('now') WHERE job_id=?`).bind(id).run();

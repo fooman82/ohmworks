@@ -256,7 +256,7 @@ export async function xeroSyncJob(env, jobId) {
   let xeroId = inv.xero_invoice_id;
 
   if (!xeroId) {
-    const items = (await env.DB.prepare('SELECT description,qty,unit_price FROM job_items WHERE job_id=? ORDER BY id').bind(jobId).all()).results;
+    const items = (await env.DB.prepare('SELECT description,qty,unit_price FROM job_items WHERE job_id=? AND on_invoice=1 ORDER BY id').bind(jobId).all()).results;
     if (!items.length) throw new Error('The job has no line items');
     let contactId = job.xero_contact_id;
     if (!contactId && !job.name.includes('"')) {

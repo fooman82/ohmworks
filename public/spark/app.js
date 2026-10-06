@@ -140,7 +140,7 @@ async function jobPage(id, params) {
     ${id === 'new' ? '' : `
     <div class="card"><h2>Line items</h2><div class="tablewrap"><table>
       <tr><th>Description</th><th class="right">Qty</th><th class="right">Unit (ex GST)</th><th class="right">Total</th><th></th></tr>
-      ${j.items.map((i) => `<tr><td>${esc(i.description)}</td><td class="right">${i.qty}</td><td class="right">${money(i.unit_price)}</td><td class="right">${money(i.qty * i.unit_price)}</td><td><button class="sec" data-rm="${i.id}">✕</button></td></tr>`).join('')}
+      ${j.items.map((i) => `<tr><td>${esc(i.description)}${j.invoice && !i.on_invoice ? ' <span class="muted">(not on invoice)</span>' : ''}</td><td class="right">${i.qty}</td><td class="right">${money(i.unit_price)}</td><td class="right">${money(i.qty * i.unit_price)}</td><td><button class="sec" data-rm="${i.id}">✕</button></td></tr>`).join('')}
       <tr><td colspan="3" class="right muted">Subtotal</td><td class="right">${money(j.totals.subtotal)}</td><td></td></tr>
       <tr><td colspan="3" class="right muted">GST (10%)</td><td class="right">${money(j.totals.gst)}</td><td></td></tr>
       <tr><td colspan="3" class="right"><b>Total</b></td><td class="right"><b>${money(j.totals.total)}</b></td><td></td></tr></table></div>
@@ -149,8 +149,8 @@ async function jobPage(id, params) {
         <input name="description" placeholder="Description" class="grow" required>
         <input name="qty" type="number" step="0.01" value="1" style="width:80px"><input name="unit_price" type="number" step="0.01" placeholder="Unit $" style="width:100px" required>
         <button>Add</button></form></div>
-    <div class="card"><h2>Invoice</h2>${j.invoice ? `<p><b>${esc(j.invoice.number)}</b> issued ${esc(j.invoice.issued_at)}, due ${esc(j.invoice.due_at)} ${j.invoice.paid_at ? badge('paid') : ''}</p>` : '<p class="muted">Not invoiced yet.</p>'}
-      <div class="row">${!j.invoice ? '<button id="mkinv">Create invoice</button>' : ''}${j.invoice && !j.invoice.paid_at ? '<button class="ok" id="paid">Mark paid</button>' : ''}${j.invoice ? '<button class="sec" onclick="window.print()">Print / Save PDF</button>' : ''}</div></div>
+    <div class="card"><h2>Invoice</h2>${j.invoice ? `<p><b>${esc(j.invoice.number)}</b> issued ${esc(j.invoice.issued_at)}, due ${esc(j.invoice.due_at)} ${j.invoice.paid_at ? badge('paid') : ''}</p>` : '<p class="muted">Not invoiced yet. Tick the parts and labour to include on the invoice.</p>' + (j.items.length ? '<div class="tablewrap"><table>' + j.items.map((i) => `<tr><td style="width:30px"><input type="checkbox" class="invsel" value="${i.id}" checked></td><td>${esc(i.description)}</td><td class="right">${i.qty}</td><td class="right">${money(i.qty * i.unit_price)}</td></tr>`).join('') + '</table></div><p class="muted" id="invsum"></p>' : '')}
+      <div class="row">${!j.invoice ? '<button id="mkinv">Create invoice</button>' : ''}${j.invoice && me.role === 'admin' ? '<button class="bad" id="delinv">Delete invoice</button>' : ''}${j.invoice && !j.invoice.paid_at ? '<button class="ok" id="paid">Mark paid</button>' : ''}${j.invoice ? '<button class="sec" onclick="window.print()">Print / Save PDF</button>' : ''}</div></div>
     <div class="card"><h2>Notes</h2><form class="row" id="addn"><input name="body" class="grow" placeholder="Add a note" required><button>Add</button></form>
       ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at)} · ${esc(n.user_name || '')}</span><br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
 
@@ -175,7 +175,10 @@ async function jobPage(id, params) {
   $('#pick').onchange = (e) => { const o = e.target.selectedOptions[0]; $('#addi [name=item_id]').value = o.value; if (o.value) { $('#addi [name=description]').value = o.dataset.n; $('#addi [name=unit_price]').value = o.dataset.p; } };
   $('#addi').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/items`, 'POST', formData(e.target)); route(); }); };
   $('#addn').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/notes`, 'POST', formData(e.target)); route(); }); };
-  const mk = $('#mkinv'); if (mk) mk.onclick = () => act(async () => { await api(`jobs/${id}/invoice`, 'POST'); route(); });
+  const sums = () => { const el = $('#invsum'); if (!el) return; const ids = [...document.querySelectorAll('.invsel:checked')].map((c) => c.value); const sub = j.items.filter((i) => ids.includes(String(i.id))).reduce((s, i) => s + i.qty * i.unit_price, 0); el.textContent = `Invoicing ${ids.length} of ${j.items.length} lines: ${money(sub)} ex GST, ${money(sub * 1.1)} inc GST`; };
+  document.querySelectorAll('.invsel').forEach((c) => (c.onchange = sums)); sums();
+  const mk = $('#mkinv'); if (mk) mk.onclick = () => act(async () => { const item_ids = [...document.querySelectorAll('.invsel:checked')].map((c) => Number(c.value)); if (j.items.length && !item_ids.length) return toast('Tick at least one item to invoice'); await api(`jobs/${id}/invoice`, 'POST', { item_ids }); route(); });
+  const di = $('#delinv'); if (di) di.onclick = () => confirm('Delete invoice ' + j.invoice.number + '? The job returns to Completed and every line goes back to being available to invoice.') && act(async () => { await api(`jobs/${id}/invoice`, 'DELETE'); toast('Invoice deleted'); route(); });
   const pd = $('#paid'); if (pd) pd.onclick = () => act(async () => { await api(`jobs/${id}/paid`, 'POST'); route(); });
   if (window.SPARK_X) window.SPARK_X.jobHook(id, j).catch((e) => toast(e.message));
 }

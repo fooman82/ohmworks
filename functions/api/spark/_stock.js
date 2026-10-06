@@ -256,8 +256,8 @@ export async function handleStock({ env, request, url, parts, body, user, json, 
           if (blank(body.unit_price)) unit = p.unit_price;
         }
         if (!description) return err('Description required');
-        const r = await env.DB.prepare('INSERT INTO job_items (job_id,description,qty,unit_price,cost,item_id) VALUES (?,?,?,?,?,?)')
-          .bind(id, description, Number(body.qty) || 1, unit, cost, itemId).run();
+        const r = await env.DB.prepare('INSERT INTO job_items (job_id,description,qty,unit_price,cost,item_id,on_invoice) VALUES (?,?,?,?,?,?,(SELECT CASE WHEN EXISTS (SELECT 1 FROM invoices WHERE job_id=?) THEN 0 ELSE 1 END))')
+          .bind(id, description, Number(body.qty) || 1, unit, cost, itemId, id).run();
         await syncStock(env, id, user.id); // if the job is already completed the stock is taken straight away
         return json({ id: r.meta.last_row_id }, 201);
       }
