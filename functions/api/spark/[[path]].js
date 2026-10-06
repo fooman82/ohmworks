@@ -2,6 +2,7 @@
 import { handleExtra, handlePortal } from './_extra.js';
 import { handlePhase3, portalPay, runReminders } from './_phase3.js';
 import { handleTemplates } from './_templates.js';
+import { handleInvoices } from './_invoices.js';
 import { handleStock, syncStock } from './_stock.js';
 import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
@@ -117,6 +118,8 @@ export async function onRequest({ request, env, params }) {
     }
 
     // ---------- Phase 4: price list, supplier items, stock ----------
+    const p6 = await handleInvoices({ env, request, url, parts, user, json });
+    if (p6) return p6;
     const p5 = await handleTemplates({ env, request, parts, body, user, json, err });
     if (p5) return p5;
     const p4 = await handleStock({ env, request, url, parts, body, user, json, err });

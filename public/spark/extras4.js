@@ -193,5 +193,48 @@ X.jobHook = async (id, j) => {
   $('#tplgo').onclick = () => { const v = $('#tplpick').value; if (v) act(async () => { const r = await api(`jobs/${id}/apply-template`, 'POST', { template_id: v }); toast(`Applied: ${r.parts} part(s)${r.hours ? ', ' + r.hours + ' h labour' : ''}`); S.route(); }); };
 };
 
-Object.assign(X.pages, { pricelist, item, supplier, templates, template });
+// ======================================================================= Invoices list
+const invFilter = { status: 'unpaid', q: '', from: '', to: '', client: '0', sort: 'due' };
+const STATUS_LABEL = { paid: 'Paid', unpaid: 'Unpaid', overdue: 'Overdue', partial: 'Part paid' };
+const STATUS_STYLE = { paid: 'background:#0d3a2a;color:var(--ok)', overdue: 'background:#3a1212;color:var(--bad)', partial: 'background:#3a2f0d;color:#f0b429', unpaid: '' };
+
+async function invoices() {
+  const f = invFilter;
+  shell('invoices', `<h1>Invoices</h1>
+    <div class="card"><div class="row" style="flex-wrap:wrap">
+      <select id="i_status"><option value="unpaid">Unpaid (incl. overdue)</option><option value="overdue">Overdue only</option><option value="partial">Part paid</option><option value="paid">Paid</option><option value="all">All invoices</option></select>
+      <input id="i_q" class="grow" placeholder="Search invoice #, client or job" style="min-width:160px">
+      <select id="i_client"><option value="0">All clients</option></select>
+      <label class="muted">Issued from <input type="date" id="i_from"></label><label class="muted">to <input type="date" id="i_to"></label>
+      <select id="i_sort"><option value="due">Earliest due date</option><option value="due_desc">Latest due date</option><option value="issued">Newest issued</option><option value="issued_asc">Oldest issued</option><option value="balance">Largest balance</option><option value="total">Largest total</option><option value="client">Client A–Z</option><option value="number">Invoice # (newest)</option></select>
+      <button class="sec" id="i_reset" type="button">Reset</button><a href="/api/spark/export/invoices" style="padding:8px">⬇ CSV</a></div></div>
+    <div id="i_sum" class="row" style="flex-wrap:wrap"></div>
+    <div class="card tablewrap" id="i_list"><p class="muted">Loading…</p></div>`);
+  $('#i_status').value = f.status; $('#i_q').value = f.q; $('#i_from').value = f.from; $('#i_to').value = f.to; $('#i_sort').value = f.sort;
+
+  const load = () => act(async () => {
+    Object.assign(f, { status: $('#i_status').value, q: $('#i_q').value.trim(), from: $('#i_from').value, to: $('#i_to').value, client: $('#i_client').value, sort: $('#i_sort').value });
+    const d = await api('invoices?' + new URLSearchParams(f).toString());
+    const cs = $('#i_client'); const keep = f.client;
+    cs.innerHTML = '<option value="0">All clients</option>' + d.clients.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join(''); cs.value = keep;
+    const s = d.summary;
+    const box = (label, v, extra = '') => `<div class="card" style="flex:1;min-width:130px;margin:0;padding:10px"><div class="muted" style="font-size:12px">${label}</div><div style="font-size:20px;font-weight:700;${extra}">${v}</div></div>`;
+    $('#i_sum').innerHTML = box(`Invoices`, s.count) + box('Total (inc GST)', money(s.total)) + box('Paid', money(s.paid), 'color:var(--ok)') + box('Outstanding', money(s.balance))
+      + box(`Overdue${s.overdue_count ? ' (' + s.overdue_count + ')' : ''}`, money(s.overdue), s.overdue > 0 ? 'color:var(--bad)' : '') + box('GST included', money(s.gst));
+    $('#i_list').innerHTML = d.rows.length ? `<table><tr><th>Invoice</th><th>Client / job</th><th>Issued</th><th>Due</th><th>Status</th><th class="right">Ex GST</th><th class="right">Total</th><th class="right">Paid</th><th class="right">Balance</th></tr>
+      ${d.rows.map((r) => `<tr class="click" onclick="location.hash='#/job/${r.job_id}'"><td><b>${esc(r.number)}</b></td><td>${esc(r.client)}<div class="muted" style="font-size:12px">${esc(r.title)}</div></td>
+        <td>${esc(r.issued_at)}</td><td>${esc(r.due_at || '—')}${r.days_overdue ? `<div style="font-size:12px;color:var(--bad)">${r.days_overdue} day${r.days_overdue === 1 ? '' : 's'} late</div>` : ''}</td>
+        <td><span class="badge" style="${STATUS_STYLE[r.status] || ''}">${STATUS_LABEL[r.status] || r.status}</span></td>
+        <td class="right">${money(r.subtotal)}</td><td class="right">${money(r.total)}</td><td class="right">${money(r.paid)}</td><td class="right"><b>${money(r.balance)}</b></td></tr>`).join('')}
+      <tr><td colspan="5" class="right muted">Totals for ${s.count} invoice${s.count === 1 ? '' : 's'}</td><td class="right">${money(s.subtotal)}</td><td class="right"><b>${money(s.total)}</b></td><td class="right"><b>${money(s.paid)}</b></td><td class="right"><b>${money(s.balance)}</b></td></tr></table>
+      ${d.truncated ? '<p class="muted">Showing the first 500 matches. Narrow the filters to see the rest.</p>' : ''}`
+      : `<p class="muted">No ${f.status === 'all' ? '' : (STATUS_LABEL[f.status] || f.status).toLowerCase() + ' '}invoices match these filters.</p>`;
+  });
+  let t; $('#i_q').oninput = () => { clearTimeout(t); t = setTimeout(load, 300); };
+  ['i_status', 'i_client', 'i_from', 'i_to', 'i_sort'].forEach((k) => ($('#' + k).onchange = load));
+  $('#i_reset').onclick = () => { Object.assign(f, { status: 'unpaid', q: '', from: '', to: '', client: '0', sort: 'due' }); invoices(); };
+  await load();
+}
+
+Object.assign(X.pages, { pricelist, item, supplier, templates, template, invoices });
 })();
