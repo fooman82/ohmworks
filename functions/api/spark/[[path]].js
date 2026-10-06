@@ -1,5 +1,5 @@
 // SPARK backend API (Cloudflare Pages Function + D1). Mounted at /api/spark/*
-import { handleExtra, handlePortal } from './_extra.js';
+import { handleExtra, handlePortal, sendMail } from './_extra.js';
 import { handlePhase3, portalPay, runReminders } from './_phase3.js';
 import { handleTemplates } from './_templates.js';
 import { handleInvoices } from './_invoices.js';
@@ -18,6 +18,9 @@ async function hashPw(password, salt) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 100000, hash: 'SHA-256' }, key, 256);
   return b64(bits);
+}
+async function sha256(s) {
+  return b64(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
 }
 const randToken = () => b64(crypto.getRandomValues(new Uint8Array(32))).replace(/[+/=]/g, '');
 
@@ -94,6 +97,33 @@ export async function onRequest({ request, env, params }) {
         const u = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND active = 1').bind((body.email || '').toLowerCase()).first();
         if (!u || (await hashPw(body.password || '', u.pass_salt)) !== u.pass_hash) return err('Invalid email or password', 401);
         return json({ ok: true }, 200, { 'set-cookie': await createSession(env, u.id) });
+      }
+      if (id === 'forgot' && method === 'POST') {
+        const email = String(body.email || '').trim().toLowerCase();
+        const u = email ? await env.DB.prepare('SELECT id,name,email FROM users WHERE email = ? AND active = 1').bind(email).first() : null;
+        if (u) {
+          const token = randToken();
+          await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ? OR expires_at < datetime(\'now\')').bind(u.id).run();
+          await env.DB.prepare(`INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES (?, ?, datetime('now', '+1 hour'))`).bind(await sha256(token), u.id).run();
+          const link = `${url.origin}/spark/#/reset/${token}`;
+          await sendMail(env, {
+            to: u.email, subject: 'Reset your SPARK password',
+            text: `Hi ${u.name},\n\nUse this link to set a new password (valid for 1 hour):\n${link}\n\nIf you did not ask for this, ignore this email.`,
+            html: `<p>Hi ${u.name.replace(/[<>&"]/g, '')},</p><p><a href="${link}">Set a new password</a> (link valid for 1 hour).</p><p>If you did not ask for this, ignore this email.</p>`,
+          }).catch(() => {});
+        }
+        return json({ ok: true }); // same reply whether or not the email exists
+      }
+      if (id === 'reset' && method === 'POST') {
+        if (!body.token || !body.password || body.password.length < 10) return err('A valid link and a password of 10+ characters are required');
+        const th = await sha256(String(body.token));
+        const r = await env.DB.prepare(`SELECT user_id FROM password_resets WHERE token_hash = ? AND expires_at > datetime('now')`).bind(th).first();
+        if (!r) return err('This reset link is invalid or has expired. Request a new one.', 400);
+        const salt = randToken();
+        await env.DB.prepare('UPDATE users SET pass_hash=?, pass_salt=? WHERE id=?').bind(await hashPw(body.password, salt), salt, r.user_id).run();
+        await env.DB.prepare('DELETE FROM password_resets WHERE user_id = ?').bind(r.user_id).run();
+        await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(r.user_id).run();
+        return json({ ok: true });
       }
       if (id === 'logout' && method === 'POST') {
         const t = getCookie(request, 'spark_session');
@@ -320,9 +350,30 @@ export async function onRequest({ request, env, params }) {
         } catch { return err('Email already exists'); }
         return json({ ok: true }, 201);
       }
+      if (id && sub === 'password' && method === 'POST') {
+        if (!body.password || body.password.length < 10) return err('Password must be 10+ characters');
+        const salt = randToken();
+        await env.DB.prepare('UPDATE users SET pass_hash=?, pass_salt=? WHERE id=?').bind(await hashPw(body.password, salt), salt, id).run();
+        await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
+        return json({ ok: true });
+      }
       if (id && method === 'PUT') {
         await env.DB.prepare('UPDATE users SET name=?, role=?, active=? WHERE id=?')
           .bind(body.name, body.role === 'admin' ? 'admin' : 'staff', body.active ? 1 : 0, id).run();
+        return json({ ok: true });
+      }
+      if (id && method === 'DELETE') {
+        if (Number(id) === user.id) return err('You cannot delete your own account');
+        const t = await env.DB.prepare('SELECT role, active FROM users WHERE id=?').bind(id).first();
+        if (!t) return err('Not found', 404);
+        if (t.role === 'admin' && t.active) {
+          const n = await env.DB.prepare(`SELECT COUNT(*) AS n FROM users WHERE role='admin' AND active=1`).first();
+          if (n.n <= 1) return err('Cannot delete the last administrator');
+        }
+        try {
+          await env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+          await env.DB.prepare('DELETE FROM users WHERE id=?').bind(id).run();
+        } catch (e) { return err('This staff member has linked records and cannot be deleted. Deactivate them instead.'); }
         return json({ ok: true });
       }
     }

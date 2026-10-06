@@ -76,10 +76,37 @@ async function authScreen(needsSetup) {
       ${needsSetup ? '<label>Your name</label><input name="name" required>' : ''}
       <label>Email</label><input name="email" type="email" required autocomplete="username">
       <label>Password${needsSetup ? ' (10+ characters)' : ''}</label><input name="password" type="password" required minlength="${needsSetup ? 10 : 1}" autocomplete="${needsSetup ? 'new-password' : 'current-password'}">
-      <div class="row" style="margin-top:12px"><button>${needsSetup ? 'Create account' : 'Sign in'}</button></div></form></div>`;
+      <div class="row" style="margin-top:12px"><button>${needsSetup ? 'Create account' : 'Sign in'}</button></div></form>${needsSetup ? '' : '<p style="margin-top:12px"><a href="#" id="forgot">Forgot my password?</a></p>'}</div>`;
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(needsSetup ? 'auth/setup' : 'auth/login', 'POST', formData(e.target)); boot(); }); };
+  const fg = $('#forgot'); if (fg) fg.onclick = (e) => { e.preventDefault(); forgotScreen(); };
 }
 
+function forgotScreen() {
+  $app.innerHTML = `<div class="login card"><h1>⚡ SPARK</h1><p class="muted">Enter your email and we will send you a link to reset your password.</p>
+    <form class="form" id="f"><label>Email</label><input name="email" type="email" required autocomplete="username">
+    <div class="row" style="margin-top:12px"><button>Send reset link</button></div></form>
+    <p style="margin-top:12px"><a href="#" id="back">Back to sign in</a></p></div>`;
+  $('#back').onclick = (e) => { e.preventDefault(); boot(); };
+  $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
+    await api('auth/forgot', 'POST', formData(e.target));
+    $app.querySelector('.login').innerHTML = '<h1>⚡ SPARK</h1><p>If that email belongs to an active staff account, a reset link has been sent. It is valid for 1 hour.</p><p><a href="#" id="back2">Back to sign in</a></p>';
+    $('#back2').onclick = (ev) => { ev.preventDefault(); boot(); };
+  }); };
+}
+
+function resetScreen(token) {
+  $app.innerHTML = `<div class="login card"><h1>⚡ SPARK</h1><p class="muted">Choose a new password.</p>
+    <form class="form" id="f"><label>New password (10+ characters)</label><input name="password" type="password" minlength="10" required autocomplete="new-password">
+    <label>Confirm password</label><input name="confirm" type="password" minlength="10" required autocomplete="new-password">
+    <div class="row" style="margin-top:12px"><button>Set password</button></div></form></div>`;
+  $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
+    const d = formData(e.target);
+    if (d.password !== d.confirm) { toast('Passwords do not match'); return; }
+    await api('auth/reset', 'POST', { token, password: d.password });
+    toast('Password updated. Please sign in.');
+    location.hash = '#/'; boot();
+  }); };
+} 
 // ---------- Dashboard ----------
 async function dashboard() {
   const d = await api('dashboard');
@@ -233,7 +260,7 @@ async function staff() {
   const rows = await api('users');
   const admin = me.role === 'admin';
   shell('staff', `<h1>Staff</h1><div class="card tablewrap"><table><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th>${admin ? '<th></th>' : ''}</tr>
-    ${rows.map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role}</td><td>${u.active ? 'Yes' : 'No'}</td>${admin ? `<td><button class="sec" data-tg="${u.id}" data-a="${u.active}" data-r="${u.role}" data-n="${esc(u.name)}">${u.active ? 'Deactivate' : 'Activate'}</button></td>` : ''}</tr>`).join('')}</table></div>
+    ${rows.map((u) => `<tr><td>${esc(u.name)}</td><td>${esc(u.email)}</td><td>${u.role}</td><td>${u.active ? 'Yes' : 'No'}</td>${admin ? `<td><button class="sec" data-tg="${u.id}" data-a="${u.active}" data-r="${u.role}" data-n="${esc(u.name)}">${u.active ? 'Deactivate' : 'Activate'}</button> <button class="sec" data-pw="${u.id}" data-n="${esc(u.name)}">Set password</button>${u.id !== me.id ? ` <button class="bad" data-del="${u.id}" data-n="${esc(u.name)}">Delete</button>` : ''}</td>` : ''}</tr>`).join('')}</table></div>
     ${admin ? `<div class="card"><h2>Add staff member</h2><form class="form" id="f"><label>Name</label><input name="name" required><label>Email</label><input name="email" type="email" required>
       <label>Temporary password (10+ chars)</label><input name="password" type="password" minlength="10" required><label>Role</label><select name="role"><option value="staff">Staff</option><option value="admin">Admin</option></select>
       <div class="row" style="margin-top:12px"><button>Add</button></div></form></div>` : ''}`);
@@ -242,6 +269,15 @@ async function staff() {
   document.querySelectorAll('[data-tg]').forEach((b) => (b.onclick = () => act(async () => {
     await api('users/' + b.dataset.tg, 'PUT', { name: b.dataset.n, role: b.dataset.r, active: b.dataset.a !== '1' }); staff();
   })));
+  document.querySelectorAll('[data-pw]').forEach((b) => (b.onclick = () => {
+    const pw = prompt(`New password for ${b.dataset.n} (10+ characters):`);
+    if (!pw) return;
+    act(async () => { await api(`users/${b.dataset.pw}/password`, 'POST', { password: pw }); toast('Password updated'); });
+  }));
+  document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = () => {
+    if (!confirm(`Permanently delete ${b.dataset.n}? This cannot be undone. (Deactivate instead to keep their history.)`)) return;
+    act(async () => { await api('users/' + b.dataset.del, 'DELETE'); toast('Staff member deleted'); staff(); });
+  }));
 }
 
 // ---------- Router ----------
@@ -271,6 +307,8 @@ async function boot() {
   } catch {
     me = null;
     const s = await fetch('/api/spark/auth/status').then((r) => r.json()).catch(() => ({}));
+    const rm = location.hash.match(/^#\/reset\/([A-Za-z0-9]+)$/);
+    if (rm) return resetScreen(rm[1]);
     authScreen(!!s.needsSetup);
   }
 }
