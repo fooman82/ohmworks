@@ -75,7 +75,7 @@ async function jobHook(id) {
     <form class="row" id="addchk"><input name="label" placeholder="Add step" class="grow"><button>Add</button>
       <select id="tplsel"><option value="">Add from template…</option>${tpl.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></form></div>
 
-  <div class="card"><h2>Photos</h2><div class="row"><input type="file" id="photo" accept="image/*" capture="environment" multiple><input id="cap" placeholder="Caption (optional)" class="grow"></div>
+  <div class="card"><h2>Photos</h2><div class="row"><input type="file" id="photo" accept="image/*" multiple><input id="cap" placeholder="Caption (optional)" class="grow"></div>
     <div id="photos" class="grid" style="margin-top:8px">${x.photos.map((p) => `<div><img data-ph="${p.id}" style="width:100%;border-radius:6px;cursor:pointer" alt=""><div class="muted">${esc(p.caption || '')} <a data-delph="${p.id}">delete</a></div></div>`).join('')}</div></div>
 
   <div class="card"><h2>Customer sign-off</h2>
