@@ -3,6 +3,7 @@ import { handleExtra, handlePortal, sendMail } from './_extra.js';
 import { handlePhase3, portalPay, runReminders } from './_phase3.js';
 import { handleTemplates } from './_templates.js';
 import { handleInvoices } from './_invoices.js';
+import { getGst } from './_gst.js';
 import { handleStock, syncStock } from './_stock.js';
 import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
@@ -48,8 +49,9 @@ const pick = (o, keys) => keys.map((k) => (o[k] === undefined || o[k] === '' ? n
 async function jobTotals(env, jobId) {
   const r = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS subtotal FROM job_items WHERE job_id = ? AND on_invoice = 1').bind(jobId).first();
   const subtotal = Math.round(r.subtotal * 100) / 100;
-  const gst = Math.round(subtotal * GST * 100) / 100;
-  return { subtotal, gst, total: Math.round((subtotal + gst) * 100) / 100 };
+  const G = await getGst(env);
+  const gst = Math.round(subtotal * G.rate * 100) / 100;
+  return { subtotal, gst, gst_pct: G.pct, total: Math.round((subtotal + gst) * 100) / 100 };
 }
 
 export async function onRequest({ request, env, params }) {
@@ -170,7 +172,7 @@ export async function onRequest({ request, env, params }) {
         `SELECT j.id, j.title, j.scheduled_start, j.status, c.name AS client_name FROM jobs j JOIN clients c ON c.id = j.client_id
          WHERE date(j.scheduled_start) = date('now','localtime') AND j.status NOT IN ('cancelled','paid') ORDER BY j.scheduled_start`).all();
       const unpaid = await env.DB.prepare(
-        `SELECT COALESCE(SUM(i.qty*i.unit_price),0)*1.1 AS amt FROM job_items i JOIN jobs j ON j.id=i.job_id WHERE j.status='invoiced' AND i.on_invoice=1`).first();
+        `SELECT COALESCE(SUM(i.qty*i.unit_price),0)*${(await getGst(env)).mult} AS amt FROM job_items i JOIN jobs j ON j.id=i.job_id WHERE j.status='invoiced' AND i.on_invoice=1`).first();
       return json({ counts: counts.results, today: today.results, outstanding: Math.round(unpaid.amt * 100) / 100 });
     }
 

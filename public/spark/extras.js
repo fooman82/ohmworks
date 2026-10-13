@@ -187,7 +187,7 @@ async function settings() {
   const field = (k, label, ta) => `<label>${label}</label>${ta ? `<textarea name="${k}" ${admin ? '' : 'disabled'}>${esc(s[k])}</textarea>` : `<input name="${k}" value="${esc(s[k])}" ${admin ? '' : 'disabled'}>`}`;
   shell('settings', `<h1>Settings</h1><div class="card"><form class="form" id="f">
     ${field('business_name', 'Business name')}${field('abn', 'ABN')}${field('licence', 'Licence number')}${field('phone', 'Phone')}${field('email', 'Reply-to email')}${field('address', 'Address')}
-    ${field('hourly_rate', 'Hourly labour rate (ex GST)')}${field('payment_days', 'Default payment terms (days)')}
+    ${field('hourly_rate', 'Hourly labour rate (ex GST)')}${field('gst_rate', 'GST rate (%)')}${field('payment_days', 'Default payment terms (days)')}
     ${field('bank_details', 'Bank / payment details shown on invoices', true)}${field('quote_terms', 'Quote terms', true)}${field('invoice_terms', 'Invoice terms', true)}
     ${admin ? '<div class="row" style="margin-top:12px"><button>Save settings</button></div>' : ''}</form></div>
     <div class="card"><h2>Checklist templates</h2>${tpl.map((t) => `<p><b>${esc(t.name)}</b> <a data-deltpl="${t.id}">delete</a><br><span class="muted">${esc(t.items).replace(/\n/g, ' · ')}</span></p>`).join('')}

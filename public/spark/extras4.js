@@ -6,8 +6,21 @@ const { api, act, esc, money, fmtDT, shell, toast, formData, $ } = S;
 const isAdmin = () => S.me().role === 'admin';
 const qty = (n) => String(Math.round((Number(n) || 0) * 1000) / 1000);
 
+// GST rate is a setting (percentage). Loaded once per page view; defaults to 10.
+let gstPct = 10;
+const loadGst = async () => { try { const s = await api('settings'); const n = Number(s.gst_rate); if (s.gst_rate !== undefined && s.gst_rate !== '' && Number.isFinite(n) && n >= 0) gstPct = n; } catch { /* default */ } };
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+const incOf = (ex) => r2((Number(ex) || 0) * (1 + gstPct / 100));
+const exOf = (inc) => r2((Number(inc) || 0) / (1 + gstPct / 100));
+// Two linked inputs: typing in one fills the other
+const linkPrice = (exEl, incEl) => {
+  exEl.addEventListener('input', () => { incEl.value = exEl.value === '' ? '' : incOf(exEl.value).toFixed(2); });
+  incEl.addEventListener('input', () => { exEl.value = incEl.value === '' ? '' : exOf(incEl.value).toFixed(2); exEl.dispatchEvent(new Event('change')); });
+};
+
 // ======================================================================= Price list
 async function pricelist() {
+  await loadGst();
   shell('pricelist', `<h1>Price list</h1>
     <div class="row"><input id="q" class="grow" placeholder="Search name, manufacturer, part number…"><select id="sf"><option value="0">All suppliers</option></select>
       <label class="row" style="gap:4px"><input type="checkbox" id="so"> Stock items only</label><button onclick="location.hash='#/item/new'">+ New item</button><a href="/api/spark/export/pricelist" style="padding:8px">⬇ CSV</a></div>
@@ -16,10 +29,10 @@ async function pricelist() {
   $('#sf').innerHTML += sups.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
   const load = () => act(async () => {
     const rows = await api(`pricelist?q=${encodeURIComponent($('#q').value)}&supplier=${$('#sf').value}&stock=${$('#so').checked ? 1 : 0}`);
-    $('#list').innerHTML = rows.length ? `<table><tr><th>Item</th><th>Manufacturer</th><th>Mfr part #</th><th>Suppliers (part # / cost)</th><th class="right">Cost</th><th class="right">Sell</th><th class="right">In stock</th></tr>
+    $('#list').innerHTML = rows.length ? `<table><tr><th>Item</th><th>Manufacturer</th><th>Mfr part #</th><th>Suppliers (part # / cost)</th><th class="right">Cost</th><th class="right">Sell ex GST</th><th class="right">Sell inc GST</th><th class="right">In stock</th></tr>
       ${rows.map((p) => `<tr class="click" onclick="location.hash='#/item/${p.id}'"><td>${esc(p.name)}</td><td>${esc(p.manufacturer || '')}</td><td>${esc(p.mfr_part_no || '')}</td>
         <td>${p.suppliers.map((s) => `${s.preferred ? '★ ' : ''}${esc(s.supplier)}${s.part_no ? ' · ' + esc(s.part_no) : ''} · ${money(s.cost)}`).join('<br>') || '<span class="muted">—</span>'}</td>
-        <td class="right">${money(p.cost)}</td><td class="right">${money(p.unit_price)}</td>
+        <td class="right">${money(p.cost)}</td><td class="right">${money(p.unit_price)}</td><td class="right">${money(incOf(p.unit_price))}</td>
         <td class="right">${p.track_stock ? `<b${p.stock_qty <= 0 ? ' style="color:#c0392b"' : ''}>${qty(p.stock_qty)}</b>` : '<span class="muted">n/a</span>'}</td></tr>`).join('')}</table>` : '<p class="muted">No items found.</p>';
   });
   let t; $('#q').oninput = () => { clearTimeout(t); t = setTimeout(load, 250); };
@@ -28,6 +41,7 @@ async function pricelist() {
 }
 
 async function item(id) {
+  await loadGst();
   const isNew = id === 'new';
   const p = isNew ? { track_stock: 0, stock_qty: 0, suppliers: [], moves: [] } : await api('pricelist/' + id);
   const sups = isNew ? [] : await api('suppliers');
@@ -40,6 +54,7 @@ async function item(id) {
       <label>Manufacturer part number <span class="muted">(duplicates allowed)</span></label><input name="mfr_part_no" value="${esc(p.mfr_part_no)}">
       <label>Category</label><input name="category" value="${esc(p.category)}">
       <label>Sell price (ex GST)</label><input name="unit_price" type="number" step="0.01" min="0" value="${p.unit_price ?? ''}" required>
+      <label>Sell price (inc GST ${qty(gstPct)}%)</label><input id="inc_price" type="number" step="0.01" min="0" value="${p.unit_price != null ? incOf(p.unit_price).toFixed(2) : ''}">
       <label>Cost ${!isNew && p.suppliers.length ? '<span class="muted">(set from supplier costs below)</span>' : ''}</label><input name="cost" type="number" step="0.01" min="0" value="${p.cost ?? 0}">
       <label class="row" style="gap:6px"><input type="checkbox" name="is_labour" value="1"${sel(p.is_labour)}> Labour item</label>
       <label class="row" style="gap:6px"><input type="checkbox" name="track_stock" value="1"${sel(p.track_stock)}> Track stock on hand</label>
@@ -58,6 +73,7 @@ async function item(id) {
         <input name="qty" type="number" step="0.001" placeholder="Quantity" style="width:120px" required><input name="reason" class="grow" placeholder="Reason (e.g. received order, stocktake)"><button>Update stock</button></form>
       ${p.moves.length ? `<div class="tablewrap"><table><tr><th>When</th><th class="right">Change</th><th class="right">After</th><th>Reason</th><th>By</th></tr>${p.moves.map((m) => `<tr><td>${fmtDT(m.created_at + 'Z')}</td><td class="right">${m.delta > 0 ? '+' : ''}${qty(m.delta)}</td><td class="right">${qty(m.qty_after)}</td><td>${esc(m.reason || '')}</td><td>${esc(m.user_name || '')}</td></tr>`).join('')}</table></div>` : ''}</div>`}`);
 
+  linkPrice($('#f [name=unit_price]'), $('#inc_price'));
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = formData(e.target); d.is_labour = e.target.is_labour.checked ? 1 : 0; d.track_stock = e.target.track_stock.checked ? 1 : 0;
     if (isNew) { const r = await api('pricelist', 'POST', d); location.hash = '#/item/' + r.id; } else { await api('pricelist/' + id, 'PUT', d); toast('Saved'); item(id); }
@@ -102,10 +118,11 @@ async function templates() {
 }
 
 async function template(id) {
+  await loadGst();
   const isNew = id === 'new';
   const t = isNew ? { items: [], hours: 0 } : await api('templates/' + id);
   const pl = await api('pricelist');
-  const items = t.items.map((i) => ({ item_id: i.item_id, qty: i.qty, unit_price: i.unit_price ?? null }));
+  const items = t.items.map((i) => ({ item_id: i.item_id, qty: i.qty, unit_price: i.override_price ?? null }));
   const optionsHtml = () => `<option value="">Add part or labour…</option>${pl.map((p) => `<option value="${p.id}">${p.is_labour ? '⏱ ' : ''}${esc(p.name)}${p.manufacturer ? ' (' + esc(p.manufacturer) + ')' : ''}</option>`).join('')}`;
   // Always show the latest price list: refetch whenever the picker is opened
   let refreshing = false;
@@ -119,13 +136,17 @@ async function template(id) {
     } catch { /* keep the existing list */ } finally { refreshing = false; }
   };
   const draw = () => {
-    $('#tparts').innerHTML = items.length ? `<table><tr><th>Part / labour</th><th class="right">Qty / hours</th><th class="right">Current sell</th><th class="right">Override sell</th><th></th></tr>${items.map((it, n) => {
+    $('#tparts').innerHTML = items.length ? `<table><tr><th>Part / labour</th><th class="right">Qty / hours</th><th class="right">Current ex GST</th><th class="right">Current inc GST</th><th class="right">Override ex GST</th><th class="right">Override inc GST</th><th></th></tr>${items.map((it, n) => {
       const p = pl.find((x) => x.id === it.item_id) || {};
-      return `<tr><td>${p.is_labour ? '⏱ ' : ''}${esc(p.name || 'Removed item')}</td><td class="right"><input type="number" step="0.01" min="0.01" value="${it.qty}" data-q="${n}" style="width:80px"></td><td class="right">${money(p.unit_price)}</td><td class="right"><input type="number" step="0.01" min="0" placeholder="use current" value="${it.unit_price ?? ''}" data-p="${n}" style="width:100px"></td><td><button type="button" class="sec" data-x="${n}">✕</button></td></tr>`;
+      const ov = it.unit_price;
+      return `<tr><td>${p.is_labour ? '⏱ ' : ''}${esc(p.name || 'Removed item')}</td><td class="right"><input type="number" step="0.01" min="0.01" value="${it.qty}" data-q="${n}" style="width:80px"></td><td class="right">${money(p.unit_price)}</td><td class="right">${money(incOf(p.unit_price))}</td><td class="right"><input type="number" step="0.01" min="0" placeholder="use current" value="${ov ?? ''}" data-p="${n}" style="width:100px"></td><td class="right"><input type="number" step="0.01" min="0" placeholder="use current" value="${ov != null ? incOf(ov).toFixed(2) : ''}" data-pi="${n}" style="width:100px"></td><td><button type="button" class="bad" data-x="${n}" title="Remove from template">Remove</button></td></tr>`;
     }).join('')}</table>` : '<p class="muted">No parts added.</p>';
     document.querySelectorAll('[data-q]').forEach((i) => (i.onchange = () => { items[i.dataset.q].qty = Number(i.value) || 1; }));
-    document.querySelectorAll('[data-p]').forEach((i) => (i.onchange = () => { items[i.dataset.p].unit_price = i.value === '' ? null : Number(i.value); }));
-    document.querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => { items.splice(b.dataset.x, 1); draw(); }));
+    document.querySelectorAll('[data-p]').forEach((i) => {
+      i.onchange = () => { items[i.dataset.p].unit_price = i.value === '' ? null : Number(i.value); };
+      linkPrice(i, document.querySelector(`[data-pi="${i.dataset.p}"]`));
+    });
+    document.querySelectorAll('[data-x]').forEach((b) => (b.onclick = () => { items.splice(Number(b.dataset.x), 1); draw(); }));
   };
   shell('templates', `<h1>${isNew ? 'New quote template' : esc(t.name)}</h1><div class="card"><form class="form" id="f">
     <label>Template name</label><input name="name" value="${esc(t.name)}" required>
@@ -137,13 +158,14 @@ async function template(id) {
       <button type="button" class="sec" id="tnew">+ New item</button></div>
     <div id="npanel" class="card" style="display:none;margin-top:8px"><h4 style="margin:0 0 8px">New price list item</h4>
       <div class="row"><input id="n_name" class="grow" placeholder="Item name"><input id="n_mfr" placeholder="Manufacturer" style="width:150px"></div>
-      <div class="row" style="margin-top:6px"><input id="n_price" type="number" step="0.01" min="0" placeholder="Sell price ex GST" style="width:150px"><input id="n_cost" type="number" step="0.01" min="0" placeholder="Cost ex GST" style="width:130px">
+      <div class="row" style="margin-top:6px"><input id="n_price" type="number" step="0.01" min="0" placeholder="Sell ex GST" style="width:120px"><input id="n_price_inc" type="number" step="0.01" min="0" placeholder="Sell inc GST" style="width:120px"><input id="n_cost" type="number" step="0.01" min="0" placeholder="Cost ex GST" style="width:130px">
         <label class="row" style="gap:4px"><input type="checkbox" id="n_lab"> Labour</label></div>
       <div class="row" style="margin-top:8px"><button type="button" id="n_save">Create and add to template</button><button type="button" class="sec" id="n_cancel">Cancel</button></div>
       <p class="muted" style="margin:6px 0 0">The item is saved to the price list and added using the quantity above. Add suppliers and part numbers later from the Price list.</p></div>
     <p class="muted">Leave "Override sell" blank to use the current sell price when the template is applied; enter a value to fix the price for that line. Prices are copied onto the quote and never change afterwards.</p>
     <div class="row" style="margin-top:12px"><button>Save</button>${!isNew ? '<button type="button" class="sec" id="copy">Copy template</button><button type="button" class="bad" id="del">Delete</button>' : ''}<a href="#/templates" style="padding:8px">Back</a></div></form></div>`);
   draw();
+  linkPrice($('#n_price'), $('#n_price_inc'));
   $('#tpick').addEventListener('focus', refreshPicker);
   $('#tpick').addEventListener('mousedown', refreshPicker);
   window.addEventListener('focus', refreshPicker, { once: true });
@@ -165,7 +187,7 @@ async function template(id) {
     $('#tpick').innerHTML = optionsHtml();
     items.push({ item_id: r.id, qty: Number($('#tqty').value) || 1 });
     draw();
-    ['n_name', 'n_mfr', 'n_price', 'n_cost'].forEach((k) => ($('#' + k).value = '')); $('#n_lab').checked = false;
+    ['n_name', 'n_mfr', 'n_price', 'n_price_inc', 'n_cost'].forEach((k) => ($('#' + k).value = '')); $('#n_lab').checked = false;
     panel.style.display = 'none';
     toast(`"${name}" added to the price list and this template`);
   });

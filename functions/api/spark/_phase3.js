@@ -1,5 +1,6 @@
 // SPARK phase 3 API: suppliers, CSV import, SMS, integrations status, Xero sync, reminders, extended reports, mobile "my jobs".
 import { getSettings, totals, r2 } from './_extra.js';
+import { getGst } from './_gst.js';
 import {
   smsProvider, sendSms, fillTemplate, whenParts, sydneyNow, normalisePhone,
   xeroStatus, xeroConnectUrl, xeroDisconnect, xeroSyncJob, xeroConfigured, createCheckout,
@@ -275,7 +276,7 @@ export async function handlePhase3({ env, request, url, parts, body, user, json,
     const profit = (await env.DB.prepare(
       `SELECT j.id, j.title, c.name AS client_name,
          ROUND(COALESCE((SELECT SUM(qty*unit_price) FROM job_items WHERE job_id=j.id AND on_invoice=1),0),2) AS revenue,
-         ROUND(COALESCE((SELECT SUM(qty*cost) FROM job_items WHERE job_id=j.id),0) + COALESCE((SELECT SUM(amount)/1.1 FROM expenses WHERE job_id=j.id),0),2) AS costs
+         ROUND(COALESCE((SELECT SUM(qty*cost) FROM job_items WHERE job_id=j.id),0) + COALESCE((SELECT SUM(amount)/${(await getGst(env)).mult} FROM expenses WHERE job_id=j.id),0),2) AS costs
        FROM jobs j JOIN clients c ON c.id=j.client_id WHERE j.status IN ('completed','invoiced','paid') ORDER BY j.id DESC LIMIT 15`).all()).results
       .map((p) => ({ ...p, margin: r2(p.revenue - p.costs) }));
     const suppliers = (await env.DB.prepare(`SELECT COALESCE(supplier,'(none)') AS supplier, ROUND(SUM(amount),2) AS total FROM expenses WHERE spent_on >= date('now','-365 days') GROUP BY supplier ORDER BY total DESC LIMIT 10`).all()).results;
