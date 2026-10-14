@@ -12,8 +12,9 @@ export async function getSettings(env) {
 export async function totals(env, jobId) {
   const t = await env.DB.prepare('SELECT COALESCE(SUM(qty*unit_price),0) AS s, COALESCE(SUM(qty*cost),0) AS c FROM job_items WHERE job_id=? AND on_invoice=1').bind(jobId).first();
   const p = await env.DB.prepare('SELECT COALESCE(SUM(amount),0) AS p FROM payments WHERE job_id=?').bind(jobId).first();
-  const subtotal = r2(t.s), gst = r2(subtotal * (await getGst(env)).rate), total = r2(subtotal + gst);
-  return { subtotal, gst, total, cost: r2(t.c), paid: r2(p.p), balance: r2(total - p.p) };
+  const G = await getGst(env);
+  const subtotal = r2(t.s), gst = r2(subtotal * G.rate), total = r2(subtotal + gst);
+  return { subtotal, gst, gst_on: G.enabled, gst_pct: G.pct, total, cost: r2(t.c), paid: r2(p.p), balance: r2(total - p.p) };
 }
 
 async function ensureToken(env, jobId) {
@@ -66,7 +67,7 @@ async function buildEmail(env, origin, job, kind, message) {
     <h3>${esc(heading)}</h3><p>Hi ${esc(job.client_name)},</p><p>${esc(intro).replace(/\n/g, '<br>')}</p>
     <p><b>${esc(job.title)}</b>${job.site_address ? '<br>' + esc(job.site_address) : ''}</p>
     ${showTable ? `<table style="width:100%;border-collapse:collapse"><tr><th align="left">Item</th><th align="right">Qty</th><th align="right">Amount</th></tr>${rows}
-      <tr><td colspan="2" align="right">Subtotal</td><td align="right">${money(t.subtotal)}</td></tr><tr><td colspan="2" align="right">GST</td><td align="right">${money(t.gst)}</td></tr>
+      <tr><td colspan="2" align="right">Subtotal</td><td align="right">${money(t.subtotal)}</td></tr>${t.gst_on === false ? '' : `<tr><td colspan="2" align="right">GST</td><td align="right">${money(t.gst)}</td></tr>`}
       <tr><td colspan="2" align="right"><b>Total</b></td><td align="right"><b>${money(t.total)}</b></td></tr>
       ${t.paid ? `<tr><td colspan="2" align="right">Paid</td><td align="right">${money(t.paid)}</td></tr><tr><td colspan="2" align="right"><b>Balance</b></td><td align="right"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
     <p><a href="${link}" style="background:#0b79d0;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${kind === 'quote' ? 'View &amp; accept quote' : 'View online'}</a></p>

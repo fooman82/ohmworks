@@ -51,7 +51,7 @@ async function jobTotals(env, jobId) {
   const subtotal = Math.round(r.subtotal * 100) / 100;
   const G = await getGst(env);
   const gst = Math.round(subtotal * G.rate * 100) / 100;
-  return { subtotal, gst, gst_pct: G.pct, total: Math.round((subtotal + gst) * 100) / 100 };
+  return { subtotal, gst, gst_pct: G.pct, gst_on: G.enabled, total: Math.round((subtotal + gst) * 100) / 100 };
 }
 
 export async function onRequest({ request, env, params }) {

@@ -44,7 +44,7 @@ async function load() {
   <div class="card"><h2>${title}</h2><p>Hi ${esc(j.client_name)},</p><p><b>${esc(j.title)}</b>${j.site_address ? '<br><a href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(j.site_address) + '" target="_blank" rel="noopener">' + esc(j.site_address) + '</a>' : ''}${j.scheduled_start ? '<br>Scheduled: ' + esc(j.scheduled_start) : ''}</p>
     ${j.description ? `<p class="muted">${esc(j.description).replace(/\n/g, '<br>')}</p>` : ''}
     ${j.items.length ? `<table><tr><th>Item</th><th class="r">Qty</th><th class="r">Amount</th></tr>${j.items.map((i) => `<tr><td>${esc(i.description)}</td><td class="r">${i.qty}</td><td class="r">${money(i.qty * i.unit_price)}</td></tr>`).join('')}
-      <tr><td colspan="2" class="r">Subtotal</td><td class="r">${money(t.subtotal)}</td></tr><tr><td colspan="2" class="r">GST</td><td class="r">${money(t.gst)}</td></tr>
+      <tr><td colspan="2" class="r">Subtotal</td><td class="r">${money(t.subtotal)}</td></tr>${t.gst_on === false ? '' : `<tr><td colspan="2" class="r">GST</td><td class="r">${money(t.gst)}</td></tr>`}
       <tr><td colspan="2" class="r"><b>Total</b></td><td class="r"><b>${money(t.total)}</b></td></tr>
       ${t.paid ? `<tr><td colspan="2" class="r">Paid</td><td class="r">${money(t.paid)}</td></tr><tr><td colspan="2" class="r"><b>Balance due</b></td><td class="r"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
     ${inv ? `<p class="muted">Issued ${esc(inv.issued_at)} · Due ${esc(inv.due_at)} ${inv.paid_at ? '· <span class="ok">PAID ' + esc(inv.paid_at) + '</span>' : ''}</p>` : ''}

@@ -187,13 +187,15 @@ async function settings() {
   const field = (k, label, ta) => `<label>${label}</label>${ta ? `<textarea name="${k}" ${admin ? '' : 'disabled'}>${esc(s[k])}</textarea>` : `<input name="${k}" value="${esc(s[k])}" ${admin ? '' : 'disabled'}>`}`;
   shell('settings', `<h1>Settings</h1><div class="card"><form class="form" id="f">
     ${field('business_name', 'Business name')}${field('abn', 'ABN')}${field('licence', 'Licence number')}${field('phone', 'Phone')}${field('email', 'Reply-to email')}${field('address', 'Address')}
-    ${field('hourly_rate', 'Hourly labour rate (ex GST)')}${field('gst_rate', 'GST rate (%)')}${field('payment_days', 'Default payment terms (days)')}
+    ${field('hourly_rate', 'Hourly labour rate (ex GST)')}${field('gst_rate', 'GST rate (%)')}
+    <label class="row" style="gap:6px;margin-top:8px"><input type="checkbox" name="gst_enabled" value="1" ${s.gst_enabled === '0' ? '' : 'checked'} ${admin ? '' : 'disabled'}> Registered for GST (charge GST on quotes and invoices)</label>
+    <p class="muted">Untick if your business is not registered for GST. No GST is then added or shown, and prices are the same ex and inc GST.</p>${field('payment_days', 'Default payment terms (days)')}
     ${field('bank_details', 'Bank / payment details shown on invoices', true)}${field('quote_terms', 'Quote terms', true)}${field('invoice_terms', 'Invoice terms', true)}
     ${admin ? '<div class="row" style="margin-top:12px"><button>Save settings</button></div>' : ''}</form></div>
     <div class="card"><h2>Checklist templates</h2>${tpl.map((t) => `<p><b>${esc(t.name)}</b> <a data-deltpl="${t.id}">delete</a><br><span class="muted">${esc(t.items).replace(/\n/g, ' · ')}</span></p>`).join('')}
       <form class="form" id="tf"><label>Name</label><input name="name" required><label>Steps (one per line)</label><textarea name="items" required></textarea><div class="row" style="margin-top:8px"><button>Add template</button></div></form></div>
     <div class="card"><h2>Change my password</h2><form class="form" id="pf"><label>Current password</label><input type="password" name="current_password" required><label>New password (10+ chars)</label><input type="password" name="new_password" minlength="10" required><div class="row" style="margin-top:8px"><button>Change password</button></div></form></div>`);
-  $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => { await api('settings', 'PUT', formData(e.target)); toast('Saved'); }); };
+  $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => { const d = formData(e.target); d.gst_enabled = e.target.gst_enabled.checked ? '1' : '0'; await api('settings', 'PUT', d); toast('Saved'); }); };
   $('#tf').onsubmit = (e) => { e.preventDefault(); act(async () => { await api('checklist-templates', 'POST', formData(e.target)); settings(); }); };
   document.querySelectorAll('[data-deltpl]').forEach((a) => (a.onclick = () => act(async () => { await api('checklist-templates/' + a.dataset.deltpl, 'DELETE'); settings(); })));
   $('#pf').onsubmit = (e) => { e.preventDefault(); act(async () => { await api('me/password', 'POST', formData(e.target)); e.target.reset(); toast('Password changed'); }); };

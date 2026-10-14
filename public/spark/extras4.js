@@ -8,7 +8,7 @@ const qty = (n) => String(Math.round((Number(n) || 0) * 1000) / 1000);
 
 // GST rate is a setting (percentage). Loaded once per page view; defaults to 10.
 let gstPct = 10;
-const loadGst = async () => { try { const s = await api('settings'); const n = Number(s.gst_rate); if (s.gst_rate !== undefined && s.gst_rate !== '' && Number.isFinite(n) && n >= 0) gstPct = n; } catch { /* default */ } };
+const loadGst = async () => { try { const s = await api('settings'); const n = Number(s.gst_rate); gstPct = 10; if (s.gst_rate !== undefined && s.gst_rate !== '' && Number.isFinite(n) && n >= 0) gstPct = n; if (s.gst_enabled === '0') gstPct = 0; } catch { /* default */ } };
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const incOf = (ex) => r2((Number(ex) || 0) * (1 + gstPct / 100));
 const exOf = (inc) => r2((Number(inc) || 0) / (1 + gstPct / 100));
