@@ -47,7 +47,7 @@ export async function sendMail(env, { to, subject, html, text, replyTo }) {
 
 async function buildEmail(env, origin, job, kind, message) {
   const s = await getSettings(env);
-  const items = (await env.DB.prepare('SELECT * FROM job_items WHERE job_id=? ORDER BY id').bind(job.id).all()).results;
+  const items = (await env.DB.prepare('SELECT * FROM job_items WHERE job_id=? AND on_invoice=1 ORDER BY id').bind(job.id).all()).results;
   const t = await totals(env, job.id);
   const inv = await env.DB.prepare('SELECT * FROM invoices WHERE job_id=?').bind(job.id).first();
   const link = `${origin}/spark/portal.html?t=${await ensureToken(env, job.id)}`;
@@ -389,6 +389,18 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
     if (sub === 'clone' && method === 'POST') {
       const nid = await cloneJob(env, id, { status: 'quote' });
       return nid ? json({ id: nid }, 201) : err('Not found', 404);
+    }
+    if (sub === 'email-preview' && method === 'POST') {
+      if (!KINDS.includes(body.kind)) return err('Bad email type');
+      const job = await env.DB.prepare('SELECT j.*, c.name AS client_name, c.email AS client_email FROM jobs j JOIN clients c ON c.id=j.client_id WHERE j.id=?').bind(id).first();
+      if (!job) return err('Not found', 404);
+      if (body.kind === 'invoice' || body.kind === 'reminder') {
+        const inv = await env.DB.prepare('SELECT 1 FROM invoices WHERE job_id=?').bind(id).first();
+        if (!inv) return err('Create the invoice first');
+      }
+      const m = await buildEmail(env, new URL(request.url).origin, job, body.kind, body.message);
+      const to = (body.to || job.client_email || '').trim();
+      return json({ to, valid: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to), subject: m.subject, html: m.html, text: m.text });
     }
     if (sub === 'email' && method === 'POST') {
       if (!KINDS.includes(body.kind)) return err('Bad email type');

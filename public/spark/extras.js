@@ -50,8 +50,8 @@ async function jobHook(id) {
   const totalHrs = x.time.filter((t) => t.ended_at).reduce((a, t) => a + hoursOf(t), 0);
   box.innerHTML = `
   <div class="card"><h2>Send to client</h2>
-    <div class="row"><button data-mail="quote">✉ Email quote</button><button data-mail="booking" class="sec">✉ Booking confirmation</button>
-      <button data-mail="invoice" class="sec">✉ Email invoice</button><button data-mail="reminder" class="sec">✉ Payment reminder</button>
+    <div class="row"><button data-mail="quote">✉ Email quote</button><button data-prev="quote" class="sec">👁 Preview quote</button><button data-mail="booking" class="sec">✉ Booking confirmation</button>
+      <button data-mail="invoice" class="sec">✉ Email invoice</button><button data-prev="invoice" class="sec">👁 Preview invoice</button><button data-mail="reminder" class="sec">✉ Payment reminder</button>
       <button class="sec" id="portal">🔗 Copy client link</button><button class="sec" id="clone">⎘ Duplicate job</button></div>
     ${x.quote_accepted_at ? `<p>✅ Quote accepted by <b>${esc(x.quote_accepted_name)}</b> on ${fmtDT(x.quote_accepted_at + 'Z')}</p>` : ''}
     ${x.emails.length ? `<details><summary class="muted">Email history (${x.emails.length})</summary>${x.emails.map((m) => `<div class="muted">${fmtDT(m.created_at + 'Z')} · ${esc(m.kind)} → ${esc(m.to_addr)} ${m.ok ? '✓' : '✗ ' + esc(m.detail)}</div>`).join('')}</details>` : ''}</div>
@@ -88,6 +88,21 @@ async function jobHook(id) {
     <span class="muted">When this job is completed, the next one is created automatically.</span></div></div>`;
   main.appendChild(box);
 
+  document.querySelectorAll('[data-prev]').forEach((b) => (b.onclick = () => act(async () => {
+    const kind = b.dataset.prev;
+    const r = await api(`jobs/${id}/email-preview`, 'POST', { kind });
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1000;display:flex;align-items:center;justify-content:center;padding:12px';
+    ov.innerHTML = `<div style="background:#fff;color:#111;border-radius:8px;max-width:720px;width:100%;max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="padding:12px 16px;border-bottom:1px solid #ddd;font-size:14px"><div><b>To:</b> ${r.to ? esc(r.to) : '<span style="color:#c0392b">no email address on the client</span>'}</div><div><b>Subject:</b> ${esc(r.subject)}</div></div>
+      <iframe id="pvf" style="flex:1;border:0;min-height:50vh;width:100%;background:#fff" sandbox></iframe>
+      <div style="padding:10px 16px;border-top:1px solid #ddd;display:flex;gap:8px;justify-content:flex-end"><button class="sec" id="pvx">Close</button><button id="pvs"${r.valid ? '' : ' disabled'}>✉ Send ${esc(kind)} now</button></div></div>`;
+    document.body.appendChild(ov);
+    $('#pvf').srcdoc = r.html;
+    const close = () => ov.remove();
+    $('#pvx').onclick = close; ov.onclick = (e) => { if (e.target === ov) close(); };
+    $('#pvs').onclick = () => act(async () => { $('#pvs').disabled = true; await api(`jobs/${id}/email`, 'POST', { kind }); close(); toast('Email sent'); S.route(); });
+  })));
   document.querySelectorAll('[data-mail]').forEach((b) => (b.onclick = () => act(async () => {
     const kind = b.dataset.mail;
     if (!confirm(`Send ${kind} email to the client?`)) return;
