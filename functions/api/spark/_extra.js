@@ -63,7 +63,7 @@ async function buildEmail(env, origin, job, kind, message) {
   const bank = (kind === 'invoice' || kind === 'reminder') && s.bank_details ? `<p><b>Payment details</b><br>${esc(s.bank_details).replace(/\n/g, '<br>')}</p>` : '';
   const terms = kind === 'quote' ? s.quote_terms : kind === 'booking' ? '' : s.invoice_terms;
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#111">
-    <h2 style="margin-bottom:0">${esc(s.business_name)}</h2><div style="color:#555">ABN ${esc(s.abn)} · Lic ${esc(s.licence)} · ${esc(s.phone)}</div>
+    <h2 style="margin-bottom:0">${esc(s.business_name)}</h2><div style="color:#555">ABN ${esc(s.abn)} · Lic ${esc(s.licence)} · ${esc(s.phone)} · <a href="http://www.ohmworks.com.au" style="color:#0b79d0">www.ohmworks.com.au</a></div>
     <h3>${esc(heading)}</h3><p>Hi ${esc(job.client_name)},</p><p>${esc(intro).replace(/\n/g, '<br>')}</p>
     <p><b>${esc(job.title)}</b>${job.site_address ? '<br>' + esc(job.site_address) : ''}</p>
     ${job.description && kind !== 'reminder' && kind !== 'booking' ? `<p style="white-space:pre-wrap;margin:0 0 12px"><b>Description of work</b><br>${esc(job.description)}</p>` : ''}
@@ -73,7 +73,7 @@ async function buildEmail(env, origin, job, kind, message) {
       ${t.paid ? `<tr><td colspan="2" align="right">Paid</td><td align="right">${money(t.paid)}</td></tr><tr><td colspan="2" align="right"><b>Balance</b></td><td align="right"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
     <p><a href="${link}" style="background:#0b79d0;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${kind === 'quote' ? 'View &amp; accept quote' : 'View online'}</a></p>
     ${bank}<p style="color:#666;font-size:12px">${esc(terms || '')}</p></div>`;
-  const text = `${heading}\n\nHi ${job.client_name},\n\n${intro}\n\n${job.title}${job.description && (kind === 'quote' || kind === 'invoice') ? `\n\n${job.description}` : ''}\nTotal: ${money(t.total)}${t.paid ? `\nBalance: ${money(t.balance)}` : ''}\n\nView online: ${link}\n\n${s.business_name} ${s.phone}`;
+  const text = `${heading}\n\nHi ${job.client_name},\n\n${intro}\n\n${job.title}${job.description && (kind === 'quote' || kind === 'invoice') ? `\n\n${job.description}` : ''}\nTotal: ${money(t.total)}${t.paid ? `\nBalance: ${money(t.balance)}` : ''}\n\nView online: ${link}\n\n${s.business_name} ${s.phone}\nhttp://www.ohmworks.com.au`;
   return { subject: `${heading.trim()} – ${job.title} – ${s.business_name}`, html, text };
 }
 
