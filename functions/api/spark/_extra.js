@@ -66,13 +66,14 @@ async function buildEmail(env, origin, job, kind, message) {
     <h2 style="margin-bottom:0">${esc(s.business_name)}</h2><div style="color:#555">ABN ${esc(s.abn)} · Lic ${esc(s.licence)} · ${esc(s.phone)}</div>
     <h3>${esc(heading)}</h3><p>Hi ${esc(job.client_name)},</p><p>${esc(intro).replace(/\n/g, '<br>')}</p>
     <p><b>${esc(job.title)}</b>${job.site_address ? '<br>' + esc(job.site_address) : ''}</p>
+    ${job.description && kind !== 'reminder' && kind !== 'booking' ? `<p style="white-space:pre-wrap;margin:0 0 12px"><b>Description of work</b><br>${esc(job.description)}</p>` : ''}
     ${showTable ? `<table style="width:100%;border-collapse:collapse"><tr><th align="left">Item</th><th align="right">Qty</th><th align="right">Amount</th></tr>${rows}
       <tr><td colspan="2" align="right">Subtotal</td><td align="right">${money(t.subtotal)}</td></tr>${t.gst_on === false ? '' : `<tr><td colspan="2" align="right">GST</td><td align="right">${money(t.gst)}</td></tr>`}
       <tr><td colspan="2" align="right"><b>Total</b></td><td align="right"><b>${money(t.total)}</b></td></tr>
       ${t.paid ? `<tr><td colspan="2" align="right">Paid</td><td align="right">${money(t.paid)}</td></tr><tr><td colspan="2" align="right"><b>Balance</b></td><td align="right"><b>${money(t.balance)}</b></td></tr>` : ''}</table>` : ''}
     <p><a href="${link}" style="background:#0b79d0;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${kind === 'quote' ? 'View &amp; accept quote' : 'View online'}</a></p>
     ${bank}<p style="color:#666;font-size:12px">${esc(terms || '')}</p></div>`;
-  const text = `${heading}\n\nHi ${job.client_name},\n\n${intro}\n\n${job.title}\nTotal: ${money(t.total)}${t.paid ? `\nBalance: ${money(t.balance)}` : ''}\n\nView online: ${link}\n\n${s.business_name} ${s.phone}`;
+  const text = `${heading}\n\nHi ${job.client_name},\n\n${intro}\n\n${job.title}${job.description && (kind === 'quote' || kind === 'invoice') ? `\n\n${job.description}` : ''}\nTotal: ${money(t.total)}${t.paid ? `\nBalance: ${money(t.balance)}` : ''}\n\nView online: ${link}\n\n${s.business_name} ${s.phone}`;
   return { subject: `${heading.trim()} – ${job.title} – ${s.business_name}`, html, text };
 }
 
