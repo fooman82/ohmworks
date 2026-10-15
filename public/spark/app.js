@@ -176,6 +176,7 @@ async function jobPage(id, params) {
       <label>Client</label><select name="client_id" required><option value="">Select…</option>${cl.map((c) => `<option value="${c.id}" ${String(c.id) === String(j.client_id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       <label>Title</label><input name="title" value="${esc(j.title)}" required>
       <label>Description</label><textarea name="description">${esc(j.description)}</textarea>
+      <label>Internal notes <span class="muted">(private: never shown to the customer or included in emails)</span></label><textarea name="internal_notes" rows="4" style="border-left:3px solid var(--accent)">${esc(j.internal_notes)}</textarea>
       <label>Site address</label><input name="site_address" value="${esc(j.site_address)}">
       <div class="row"><div class="grow"><label>Start</label><input type="datetime-local" name="scheduled_start" value="${toLocalInput(j.scheduled_start)}"></div>
         <div class="grow"><label>End</label><input type="datetime-local" name="scheduled_end" value="${toLocalInput(j.scheduled_end)}"></div></div>

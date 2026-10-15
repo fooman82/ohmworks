@@ -228,8 +228,8 @@ export async function onRequest({ request, env, params }) {
           if (!body.client_id || !body.title) return err('Client and title required');
           const status = JOB_STATUSES.includes(body.status) ? body.status : 'quote';
           const r = await env.DB.prepare(
-            'INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end) VALUES (?,?,?,?,?,?,?,?)')
-            .bind(body.client_id, body.title, body.description || null, body.site_address || null, status, body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null).run();
+            'INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end,internal_notes) VALUES (?,?,?,?,?,?,?,?,?)')
+            .bind(body.client_id, body.title, body.description || null, body.site_address || null, status, body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null).run();
           return json({ id: r.meta.last_row_id }, 201);
         }
       } else {
@@ -248,8 +248,8 @@ export async function onRequest({ request, env, params }) {
             if (!body.title || !body.client_id) return err('Client and title required');
             if (body.status && !JOB_STATUSES.includes(body.status)) return err('Bad status');
             await env.DB.prepare(
-              `UPDATE jobs SET client_id=?,title=?,description=?,site_address=?,status=?,assigned_to=?,scheduled_start=?,scheduled_end=?,updated_at=datetime('now') WHERE id=?`)
-              .bind(body.client_id, body.title, body.description || null, body.site_address || null, body.status || 'quote', body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, id).run();
+              `UPDATE jobs SET client_id=?,title=?,description=?,site_address=?,status=?,assigned_to=?,scheduled_start=?,scheduled_end=?,internal_notes=?,updated_at=datetime('now') WHERE id=?`)
+              .bind(body.client_id, body.title, body.description || null, body.site_address || null, body.status || 'quote', body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null, id).run();
             await syncStock(env, id, user.id);
             return json({ ok: true });
           }
