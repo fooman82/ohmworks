@@ -199,7 +199,7 @@ async function jobPage(id, params) {
     <div class="card"><h2>Invoice</h2>${j.invoice ? `<p><b>${esc(j.invoice.number)}</b> issued ${esc(j.invoice.issued_at)}, due ${esc(j.invoice.due_at)} ${j.invoice.paid_at ? badge('paid') : ''}</p>` : '<p class="muted">Not invoiced yet. Tick the parts and labour to include on the invoice.</p>' + (j.items.length ? '<div class="tablewrap"><table>' + j.items.map((i) => `<tr><td style="width:30px"><input type="checkbox" class="invsel" value="${i.id}" checked></td><td>${esc(i.description)}</td><td class="right">${i.qty}</td><td class="right">${money(i.qty * i.unit_price)}</td></tr>`).join('') + '</table></div><p class="muted" id="invsum"></p>' : '')}
       <div class="row">${!j.invoice ? '<button id="mkinv">Create invoice</button>' : ''}${j.invoice && me.role === 'admin' ? '<button class="bad" id="delinv">Delete invoice</button>' : ''}${j.invoice && !j.invoice.paid_at ? '<button class="ok" id="paid">Mark paid</button>' : ''}${j.invoice ? '<button class="sec" onclick="window.print()">Print / Save PDF</button>' : ''}</div></div>
     <div class="card"><h2>Notes</h2><form class="row" id="addn"><input name="body" class="grow" placeholder="Add a note" required><button>Add</button></form>
-      ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at + 'Z')} · ${esc(n.user_name || '')}</span><br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
+      ${j.notes.map((n) => `<p><span class="muted">${fmtDT(n.created_at + 'Z')} · ${esc(n.user_name || '')}</span>${me.role === 'admin' || n.user_id === me.id ? ` <a href="#" data-delnote="${n.id}" style="font-size:12px">delete</a>` : ''}<br>${esc(n.body)}</p>`).join('') || '<p class="muted">No notes.</p>'}</div>`}`);
 
   if (id === 'new') {
     const addr = $('#f [name=site_address]');
@@ -221,6 +221,7 @@ async function jobPage(id, params) {
   document.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => act(async () => { await api(`jobs/${id}/items/${b.dataset.rm}`, 'DELETE'); route(); })));
   $('#pick').onchange = (e) => { const o = e.target.selectedOptions[0]; $('#addi [name=item_id]').value = o.value; if (o.value) { $('#addi [name=description]').value = o.dataset.n; $('#addi [name=unit_price]').value = o.dataset.p; } };
   $('#addi').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/items`, 'POST', formData(e.target)); route(); }); };
+  document.querySelectorAll('[data-delnote]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); if (confirm('Delete this note?')) act(async () => { await api(`jobs/${id}/notes/${a.dataset.delnote}`, 'DELETE'); route(); }); }));
   $('#addn').onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${id}/notes`, 'POST', formData(e.target)); route(); }); };
   const sums = () => { const el = $('#invsum'); if (!el) return; const ids = [...document.querySelectorAll('.invsel:checked')].map((c) => c.value); const sub = j.items.filter((i) => ids.includes(String(i.id))).reduce((s, i) => s + i.qty * i.unit_price, 0); el.textContent = `Invoicing ${ids.length} of ${j.items.length} lines: ${j.totals.gst_on === false ? money(sub) : `${money(sub)} ex GST, ${money(sub * (1 + (j.totals.gst_pct ?? 10) / 100))} inc GST`}`; };
   document.querySelectorAll('.invsel').forEach((c) => (c.onchange = sums)); sums();

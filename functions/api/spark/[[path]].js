@@ -283,6 +283,13 @@ export async function onRequest({ request, env, params }) {
           await env.DB.prepare('INSERT INTO job_notes (job_id,user_id,body) VALUES (?,?,?)').bind(id, user.id, body.body).run();
           return json({ ok: true }, 201);
         }
+        if (sub === 'notes' && method === 'DELETE' && parts[3]) {
+          const n = await env.DB.prepare('SELECT id, user_id FROM job_notes WHERE id=? AND job_id=?').bind(parts[3], id).first();
+          if (!n) return err('Note not found', 404);
+          if (user.role !== 'admin' && n.user_id !== user.id) return err('You can only delete your own notes', 403);
+          await env.DB.prepare('DELETE FROM job_notes WHERE id=?').bind(n.id).run();
+          return json({ ok: true });
+        }
         if (sub === 'invoice' && method === 'POST') {
           const existing = await env.DB.prepare('SELECT * FROM invoices WHERE job_id=?').bind(id).first();
           if (existing) return json(existing);
