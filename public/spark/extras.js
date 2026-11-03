@@ -133,7 +133,36 @@ async function jobHook(id) {
   if (x.photos.length) {
     const all = await api(`jobs/${id}/photos`);
     const map = Object.fromEntries(all.map((p) => [p.id, p.data]));
-    document.querySelectorAll('[data-ph]').forEach((im) => { im.src = map[im.dataset.ph]; im.onclick = () => { const w = window.open(); w.document.write(`<img src="${map[im.dataset.ph]}" style="max-width:100%">`); }; });
+    const order = all.map((p) => p.id);
+    const capOf = Object.fromEntries(all.map((p) => [p.id, p.caption || '']));
+    const openViewer = (startId) => {
+      let i = Math.max(0, order.findIndex((v) => String(v) === String(startId)));
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
+      const btn = 'position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.2);color:#fff;border:0;font-size:32px;width:52px;height:72px;border-radius:8px;cursor:pointer';
+      ov.innerHTML = `<button type="button" data-v="prev" style="${btn};left:12px" aria-label="Previous">‹</button>
+        <img style="max-width:calc(100% - 140px);max-height:calc(100% - 80px);object-fit:contain" alt="">
+        <div class="vcap" style="color:#fff;margin-top:10px;text-align:center"></div>
+        <button type="button" data-v="next" style="${btn};right:12px" aria-label="Next">›</button>
+        <button type="button" data-v="close" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,.2);color:#fff;border:0;font-size:24px;width:44px;height:44px;border-radius:8px;cursor:pointer" aria-label="Close">✕</button>`;
+      const show = () => {
+        ov.querySelector('img').src = map[order[i]];
+        ov.querySelector('.vcap').textContent = `${i + 1} / ${order.length}${capOf[order[i]] ? ' — ' + capOf[order[i]] : ''}`;
+        ov.querySelector('[data-v=prev]').style.display = order.length > 1 ? '' : 'none';
+        ov.querySelector('[data-v=next]').style.display = order.length > 1 ? '' : 'none';
+      };
+      const go = (d) => { i = (i + d + order.length) % order.length; show(); };
+      const close = () => { document.removeEventListener('keydown', key); ov.remove(); };
+      const key = (e) => { if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); else if (e.key === 'Escape') close(); };
+      ov.onclick = (e) => { const v = e.target.dataset && e.target.dataset.v; if (v === 'prev') go(-1); else if (v === 'next') go(1); else if (v === 'close' || e.target === ov) close(); };
+      let sx = null;
+      ov.ontouchstart = (e) => { sx = e.touches[0].clientX; };
+      ov.ontouchend = (e) => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1); sx = null; };
+      document.addEventListener('keydown', key);
+      document.body.appendChild(ov);
+      show();
+    };
+    document.querySelectorAll('[data-ph]').forEach((im) => { im.src = map[im.dataset.ph]; im.onclick = () => openViewer(im.dataset.ph); });
     document.querySelectorAll('[data-delph]').forEach((a) => (a.onclick = () => confirm('Delete photo?') && act(async () => { await api(`jobs/${id}/photos/${a.dataset.delph}`, 'DELETE'); S.route(); })));
   }
 
