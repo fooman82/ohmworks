@@ -29,6 +29,7 @@ async function today() {
   const card = (j) => `<div class="card" style="padding:12px">
     <div class="row" style="margin-bottom:4px"><b class="grow" style="font-size:17px">${esc(j.title)}</b>${badge(j.status)}</div>
     <div class="muted">${j.scheduled_start ? '🕐 ' + esc(j.scheduled_start.slice(11, 16)) + ' · ' : ''}${esc(j.client_name)}</div>
+    ${j.onsite_contact_name || j.onsite_contact_phone ? `<div style="margin:4px 0">👤 Onsite: ${esc(j.onsite_contact_name || '')} ${j.onsite_contact_phone ? `<a href="tel:${esc(j.onsite_contact_phone)}">${esc(j.onsite_contact_phone)}</a>` : ''}</div>` : ''}
     ${j.site_address ? `<div style="margin:4px 0"><a href="${mapsUrl(j.site_address)}" target="_blank" rel="noopener">📍 ${esc(j.site_address)}</a></div>` : ''}
     <div class="row" style="margin-top:8px">
       ${j.client_phone ? `<a href="tel:${esc(j.client_phone)}"><button class="sec" type="button">📞 Call</button></a>` : ''}

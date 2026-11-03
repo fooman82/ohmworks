@@ -177,7 +177,9 @@ async function jobPage(id, params) {
       <label>Title</label><input name="title" value="${esc(j.title)}" required>
       <label>Description</label><textarea name="description">${esc(j.description)}</textarea>
       <label>Internal notes <span class="muted">(private: never shown to the customer or included in emails)</span></label><textarea name="internal_notes" rows="4" style="border-left:3px solid var(--accent)">${esc(j.internal_notes)}</textarea>
-      <label>Site address</label><input name="site_address" value="${esc(j.site_address)}">
+      <label>Job address <span class="muted">(defaults to the customer's address; change if the work is elsewhere)</span></label><input name="site_address" value="${esc(j.site_address)}">
+      <div class="row"><div class="grow"><label>Onsite contact name <span class="muted">(if not the customer)</span></label><input name="onsite_contact_name" value="${esc(j.onsite_contact_name)}"></div>
+        <div class="grow"><label>Onsite contact phone</label><input name="onsite_contact_phone" value="${esc(j.onsite_contact_phone)}"></div></div>
       <div class="row"><div class="grow"><label>Start</label><input type="datetime-local" name="scheduled_start" value="${toLocalInput(j.scheduled_start)}"></div>
         <div class="grow"><label>End</label><input type="datetime-local" name="scheduled_end" value="${toLocalInput(j.scheduled_end)}"></div></div>
       <div class="row"><div class="grow"><label>Status</label><select name="status">${STATUSES.map((s) => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`).join('')}</select></div>

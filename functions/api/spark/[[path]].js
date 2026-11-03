@@ -227,9 +227,11 @@ export async function onRequest({ request, env, params }) {
         if (method === 'POST') {
           if (!body.client_id || !body.title) return err('Client and title required');
           const status = JOB_STATUSES.includes(body.status) ? body.status : 'quote';
+          let addr = String(body.site_address || '').trim();
+          if (!addr) addr = (await env.DB.prepare('SELECT address FROM clients WHERE id=?').bind(body.client_id).first())?.address || null;
           const r = await env.DB.prepare(
-            'INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end,internal_notes) VALUES (?,?,?,?,?,?,?,?,?)')
-            .bind(body.client_id, body.title, body.description || null, body.site_address || null, status, body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null).run();
+            'INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end,internal_notes,onsite_contact_name,onsite_contact_phone) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+            .bind(body.client_id, body.title, body.description || null, addr, status, body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null, String(body.onsite_contact_name || '').trim() || null, String(body.onsite_contact_phone || '').trim() || null).run();
           return json({ id: r.meta.last_row_id }, 201);
         }
       } else {
@@ -247,9 +249,11 @@ export async function onRequest({ request, env, params }) {
           if (method === 'PUT') {
             if (!body.title || !body.client_id) return err('Client and title required');
             if (body.status && !JOB_STATUSES.includes(body.status)) return err('Bad status');
+            let addr = String(body.site_address || '').trim();
+            if (!addr) addr = (await env.DB.prepare('SELECT address FROM clients WHERE id=?').bind(body.client_id).first())?.address || null;
             await env.DB.prepare(
-              `UPDATE jobs SET client_id=?,title=?,description=?,site_address=?,status=?,assigned_to=?,scheduled_start=?,scheduled_end=?,internal_notes=?,updated_at=datetime('now') WHERE id=?`)
-              .bind(body.client_id, body.title, body.description || null, body.site_address || null, body.status || 'quote', body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null, id).run();
+              `UPDATE jobs SET client_id=?,title=?,description=?,site_address=?,status=?,assigned_to=?,scheduled_start=?,scheduled_end=?,internal_notes=?,onsite_contact_name=?,onsite_contact_phone=?,updated_at=datetime('now') WHERE id=?`)
+              .bind(body.client_id, body.title, body.description || null, addr, body.status || 'quote', body.assigned_to || null, body.scheduled_start || null, body.scheduled_end || null, String(body.internal_notes || '').slice(0, 5000) || null, String(body.onsite_contact_name || '').trim() || null, String(body.onsite_contact_phone || '').trim() || null, id).run();
             await syncStock(env, id, user.id);
             return json({ ok: true });
           }

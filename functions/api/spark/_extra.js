@@ -91,8 +91,8 @@ async function cloneJob(env, id, { status = 'quote', start = null, end = null, p
   const j = await env.DB.prepare('SELECT * FROM jobs WHERE id=?').bind(id).first();
   if (!j) return null;
   const r = await env.DB.prepare(
-    `INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end,category,repeat_rule,repeat_parent)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(j.client_id, j.title, j.description, j.site_address, status, j.assigned_to, start, end, j.category, null, parent).run();
+    `INSERT INTO jobs (client_id,title,description,site_address,status,assigned_to,scheduled_start,scheduled_end,category,repeat_rule,repeat_parent,onsite_contact_name,onsite_contact_phone)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(j.client_id, j.title, j.description, j.site_address, status, j.assigned_to, start, end, j.category, null, parent, j.onsite_contact_name, j.onsite_contact_phone).run();
   const nid = r.meta.last_row_id;
   await env.DB.prepare('INSERT INTO job_items (job_id,description,qty,unit_price,cost) SELECT ?,description,qty,unit_price,cost FROM job_items WHERE job_id=?').bind(nid, id).run();
   await env.DB.prepare('INSERT INTO job_checklist (job_id,label) SELECT ?,label FROM job_checklist WHERE job_id=?').bind(nid, id).run();

@@ -253,7 +253,7 @@ export async function handlePhase3({ env, request, url, parts, body, user, json,
   if (res === 'my-jobs' && method === 'GET') {
     const today = sydneyNow().date;
     const rows = (await env.DB.prepare(
-      `SELECT j.id,j.title,j.status,j.scheduled_start,j.scheduled_end,j.site_address,c.name AS client_name,c.phone AS client_phone
+      `SELECT j.id,j.title,j.status,j.scheduled_start,j.scheduled_end,j.site_address,j.onsite_contact_name,j.onsite_contact_phone,c.name AS client_name,c.phone AS client_phone
        FROM jobs j JOIN clients c ON c.id=j.client_id
        WHERE j.assigned_to=? AND j.status IN ('work_order','completed') AND (j.scheduled_start IS NULL OR date(j.scheduled_start)>=date(?,'-1 day'))
        ORDER BY COALESCE(j.scheduled_start,'9999') LIMIT 60`).bind(user.id, today).all()).results;
