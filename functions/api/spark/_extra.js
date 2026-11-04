@@ -63,10 +63,10 @@ async function buildEmail(env, origin, job, kind, message) {
   const bank = (kind === 'invoice' || kind === 'reminder') && s.bank_details ? `<p><b>Payment details</b><br>${esc(s.bank_details).replace(/\n/g, '<br>')}</p>` : '';
   const terms = kind === 'quote' ? s.quote_terms : kind === 'booking' ? '' : s.invoice_terms;
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#111">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000000;border-radius:8px 8px 0 0;margin-bottom:14px"><tr><td style="padding:12px 16px">
+    <table role="presentation" cellpadding="0" cellspacing="0" style="background:#000000;border-radius:8px;margin:0 0 10px 0;width:auto"><tr><td style="padding:10px 14px;background:#000000">
       <a href="http://www.ohmworks.com.au" style="text-decoration:none"><img src="https://www.ohmworks.com.au/images/logo.jpg" alt="OHMWORKS logo" height="56" style="height:56px;width:auto;vertical-align:middle;border:0;margin-right:14px"><img src="https://www.ohmworks.com.au/images/logo_name.jpg" alt="OHMWORKS" height="46" style="height:46px;width:auto;vertical-align:middle;border:0"></a>
     </td></tr></table>
-    <h2 style="margin-bottom:0">${esc(s.business_name)}</h2><div style="color:#555">ABN ${esc(s.abn)} · Lic ${esc(s.licence)} · ${esc(s.phone)} · <a href="http://www.ohmworks.com.au" style="color:#0b79d0">www.ohmworks.com.au</a></div>
+    <div style="color:#555">ABN ${esc(s.abn)} · Lic ${esc(s.licence)} · ${esc(s.phone)} · <a href="http://www.ohmworks.com.au" style="color:#0b79d0">www.ohmworks.com.au</a></div>
     <h3>${esc(heading)}</h3><p>Hi ${esc(job.client_name)},</p><p>${esc(intro).replace(/\n/g, '<br>')}</p>
     <p><b>${esc(job.title)}</b>${job.site_address ? '<br>' + esc(job.site_address) : ''}</p>
     ${job.description && kind !== 'reminder' && kind !== 'booking' ? `<p style="white-space:pre-wrap;margin:0 0 12px"><b>Description of work</b><br>${esc(job.description)}</p>` : ''}
