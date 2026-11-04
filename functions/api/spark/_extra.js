@@ -183,6 +183,10 @@ export async function handleExtra({ env, request, url, parts, body, user, json, 
       }
       for (const [k, v] of Object.entries(body)) {
         if (!/^[a-z_]{1,40}$/.test(k)) continue;
+        if (k === 'picker_start_hour' || k === 'picker_end_hour') {
+          const n = Number(v);
+          if (String(v).trim() !== '' && (!Number.isInteger(n) || n < 0 || n > 24)) return err('Calendar hours must be whole numbers between 0 and 24');
+        }
         await env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, String(v ?? '')).run();
       }
       return json({ ok: true });

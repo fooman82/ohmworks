@@ -160,7 +160,68 @@ async function jobs(params) {
   $('#list').innerHTML = rows.length ? `<table><tr><th>#</th><th>Job</th><th>Client</th><th>Status</th><th>Scheduled</th><th>Staff</th></tr>${rows.map((j) => `<tr class="click" onclick="location.hash='#/job/${j.id}'"><td>${j.id}</td><td>${esc(j.title)}${j.site_address ? `<div style="font-size:12px">${mapLink(j.site_address)}</div>` : ''}</td><td>${esc(j.client_name)}</td><td>${badge(j.status)}</td><td>${fmtDT(j.scheduled_start)}</td><td>${esc(j.assigned_name || '—')}</td></tr>`).join('')}</table>` : '<p class="muted">No jobs.</p>';
 }
 
-const toLocalInput = (s) => (s ? s.replace(' ', 'T').slice(0, 16) : '');
+const toLocalInput = (s) => (s ? s.replace('T', ' ').slice(0, 16) : '');
+
+// Date/time picker: 3 day columns on mobile, 5 on desktop, 24 hourly rows.
+// The view is scrolled so the configured window (settings picker_start_hour..picker_end_hour, default 6-18) is centred.
+function attachDateTimePicker(input, opts) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = (v) => { const m = /^(\d{4})-(\d\d)-(\d\d)[ T](\d\d):(\d\d)/.exec(v || ''); return m ? { d: new Date(+m[1], +m[2] - 1, +m[3]), h: +m[4], mi: +m[5] } : null; };
+  const open = () => {
+    const cols = window.innerWidth < 700 ? 3 : 5;
+    const cur = parse(input.value);
+    const ref = cur || parse(opts.fallback && opts.fallback()) || { d: new Date(), h: 9, mi: 0 };
+    let first = new Date(ref.d); first.setDate(first.getDate() - Math.floor(cols / 2));
+    let mins = cur ? cur.mi : 0;
+    const ROW = 34;
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:8px';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#fff;color:#111;border-radius:10px;width:min(100%,720px);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4)';
+    ov.appendChild(box);
+    const render = () => {
+      const days = Array.from({ length: cols }, (_, i) => { const d = new Date(first); d.setDate(d.getDate() + i); return d; });
+      const today = ymd(new Date());
+      box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid #ddd">
+          <button type="button" data-n="-${cols}" style="min-width:44px">‹</button><button type="button" data-today>Today</button><button type="button" data-n="${cols}" style="min-width:44px">›</button>
+          <span style="flex:1"></span><label style="font-size:13px">Minutes <select data-mi>${[0, 15, 30, 45].map((m) => `<option value="${m}" ${m === mins ? 'selected' : ''}>${pad(m)}</option>`).join('')}</select></label>
+          <button type="button" data-clear>Clear</button><button type="button" data-close>✕</button></div>
+        <div data-scroll style="overflow-y:auto;position:relative;flex:1;min-height:200px;height:${ROW * 10}px">
+          <div style="display:grid;grid-template-columns:52px repeat(${cols},1fr);position:sticky;top:0;background:#f4f4f4;z-index:1;border-bottom:1px solid #ddd">
+            <div></div>${days.map((d) => `<div style="text-align:center;padding:6px 2px;font-size:13px;${ymd(d) === today ? 'font-weight:700;color:#0b79d0' : ''}">${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</div>`).join('')}</div>
+          <div style="display:grid;grid-template-columns:52px repeat(${cols},1fr)">
+            ${Array.from({ length: 24 }, (_, h) => `<div style="height:${ROW}px;font-size:12px;color:#666;text-align:right;padding:8px 6px 0 0;box-sizing:border-box">${pad(h)}:00</div>${days.map((d) => {
+              const sel = cur && ymd(cur.d) === ymd(d) && cur.h === h;
+              return `<button type="button" data-d="${ymd(d)}" data-h="${h}" style="height:${ROW}px;border:1px solid #e3e3e3;margin:0;border-radius:0;cursor:pointer;background:${sel ? '#0b79d0' : (h < opts.start || h >= opts.end ? '#fafafa' : '#fff')};color:${sel ? '#fff' : '#111'}">${sel ? pad(h) + ':' + pad(cur.mi) : ''}</button>`;
+            }).join('')}`).join('')}
+          </div></div>`;
+      const sc = box.querySelector('[data-scroll]');
+      const mid = ((opts.start + opts.end) / 2) * ROW; // centre of the configured window
+      sc.scrollTop = Math.max(0, mid - sc.clientHeight / 2);
+    };
+    const close = () => { document.removeEventListener('keydown', key); ov.remove(); };
+    const key = (e) => { if (e.key === 'Escape') close(); };
+    const commit = (v) => { input.value = v; input.dispatchEvent(new Event('change', { bubbles: true })); close(); };
+    box.onclick = (e) => {
+      const t = e.target.closest('button'); if (!t) return;
+      if (t.dataset.n) { first.setDate(first.getDate() + Number(t.dataset.n)); render(); }
+      else if ('today' in t.dataset) { first = new Date(); first.setDate(first.getDate() - Math.floor(cols / 2)); render(); }
+      else if ('clear' in t.dataset) commit('');
+      else if ('close' in t.dataset) close();
+      else if (t.dataset.d) commit(`${t.dataset.d} ${pad(Number(t.dataset.h))}:${pad(mins)}`);
+    };
+    box.onchange = (e) => { if (e.target.matches('[data-mi]')) mins = Number(e.target.value); };
+    ov.onclick = (e) => { if (e.target === ov) close(); };
+    document.addEventListener('keydown', key);
+    document.body.appendChild(ov);
+    render();
+  };
+  input.readOnly = true;
+  input.style.cursor = 'pointer';
+  input.onclick = open;
+  input.onfocus = () => { if (!input.dataset.opened) { input.dataset.opened = ''; } };
+}
 
 async function jobPage(id, params) {
   const [cl, us] = await Promise.all([api('clients'), api('users')]);
@@ -180,8 +241,8 @@ async function jobPage(id, params) {
       <label>Job address <span class="muted">(defaults to the customer's address; change if the work is elsewhere)</span></label><input name="site_address" value="${esc(j.site_address)}">
       <div class="row"><div class="grow"><label>Onsite contact name <span class="muted">(if not the customer)</span></label><input name="onsite_contact_name" value="${esc(j.onsite_contact_name)}"></div>
         <div class="grow"><label>Onsite contact phone</label><input name="onsite_contact_phone" value="${esc(j.onsite_contact_phone)}"></div></div>
-      <div class="row"><div class="grow"><label>Start</label><input type="datetime-local" name="scheduled_start" value="${toLocalInput(j.scheduled_start)}"></div>
-        <div class="grow"><label>End</label><input type="datetime-local" name="scheduled_end" value="${toLocalInput(j.scheduled_end)}"></div></div>
+      <div class="row"><div class="grow"><label>Start</label><input type="text" autocomplete="off" placeholder="Select date & time" name="scheduled_start" value="${toLocalInput(j.scheduled_start)}"></div>
+        <div class="grow"><label>End</label><input type="text" autocomplete="off" placeholder="Select date & time" name="scheduled_end" value="${toLocalInput(j.scheduled_end)}"></div></div>
       <div class="row"><div class="grow"><label>Status</label><select name="status">${STATUSES.map((s) => `<option value="${s}" ${s === j.status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`).join('')}</select></div>
         <div class="grow"><label>Assigned to</label><select name="assigned_to"><option value="">Unassigned</option>${us.filter((u) => u.active).map((u) => `<option value="${u.id}" ${u.id === j.assigned_to ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div></div>
       <div class="row" style="margin-top:12px"><button>Save job</button>
@@ -210,6 +271,13 @@ async function jobPage(id, params) {
       const c = cl.find((x) => String(x.id) === e.target.value);
       if (addr.value === '' || addr.value === autoFilled) { autoFilled = (c && c.address) || ''; addr.value = autoFilled; }
     };
+  }
+  {
+    let ps = 6, pe = 18;
+    try { const st = await api('settings'); const a = Number(st.picker_start_hour), b = Number(st.picker_end_hour); if (st.picker_start_hour !== undefined && st.picker_start_hour !== '' && a >= 0 && a <= 23) ps = a; if (st.picker_end_hour !== undefined && st.picker_end_hour !== '' && b >= 1 && b <= 24) pe = b; if (pe <= ps) { ps = 6; pe = 18; } } catch { /* defaults */ }
+    const sIn = $('#f [name=scheduled_start]'), eIn = $('#f [name=scheduled_end]');
+    attachDateTimePicker(sIn, { start: ps, end: pe });
+    attachDateTimePicker(eIn, { start: ps, end: pe, fallback: () => sIn.value });
   }
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
     const d = formData(e.target);

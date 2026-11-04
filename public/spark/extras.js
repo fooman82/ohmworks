@@ -232,6 +232,8 @@ async function settings() {
   shell('settings', `<h1>Settings</h1><div class="card"><form class="form" id="f">
     ${field('business_name', 'Business name')}${field('abn', 'ABN')}${field('licence', 'Licence number')}${field('phone', 'Phone')}${field('email', 'Reply-to email')}${field('address', 'Address')}
     ${field('hourly_rate', 'Hourly labour rate (ex GST)')}${field('gst_rate', 'GST rate (%)')}
+    <div class="row"><div class="grow">${field('picker_start_hour', 'Job calendar: window start hour (0-23, default 6)')}</div><div class="grow">${field('picker_end_hour', 'Job calendar: window end hour (1-24, default 18)')}</div></div>
+    <p class="muted">The job date/time picker shows all 24 hours but scrolls to centre on this window.</p>
     <label class="row" style="gap:6px;margin-top:8px"><input type="checkbox" name="gst_enabled" value="1" ${s.gst_enabled === '0' ? '' : 'checked'} ${admin ? '' : 'disabled'}> Registered for GST (charge GST on quotes and invoices)</label>
     <p class="muted">Untick if your business is not registered for GST. No GST is then added or shown, and prices are the same ex and inc GST.</p>${field('payment_days', 'Default payment terms (days)')}
     ${field('bank_details', 'Bank / payment details shown on invoices', true)}${field('quote_terms', 'Quote terms', true)}${field('invoice_terms', 'Invoice terms', true)}
