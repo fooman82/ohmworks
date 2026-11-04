@@ -5,6 +5,7 @@ import { handleTemplates } from './_templates.js';
 import { handleInvoices } from './_invoices.js';
 import { getGst } from './_gst.js';
 import { handleStock, syncStock } from './_stock.js';
+import { handleVariations, handlePortalVariations } from './_variations.js';
 import { stripeWebhook, xeroCallback, safeEqual } from './_integrations.js';
 
 const JOB_STATUSES = ['quote', 'work_order', 'completed', 'invoiced', 'paid', 'cancelled'];
@@ -136,6 +137,7 @@ export async function onRequest({ request, env, params }) {
 
     // ---------- Public client portal (token protected) ----------
     if (res === 'portal' && parts[2] === 'pay' && method === 'POST') return await portalPay({ env, request, token: parts[1], json, err });
+    if (res === 'portal' && parts[2] === 'variations') return await handlePortalVariations({ env, request, parts, body, json, err });
     if (res === 'portal') return await handlePortal({ env, request, parts, body, json, err });
 
     // ---------- Everything below requires login ----------
@@ -156,6 +158,10 @@ export async function onRequest({ request, env, params }) {
     if (p5) return p5;
     const p4 = await handleStock({ env, request, url, parts, body, user, json, err });
     if (p4) return p4;
+
+    // ---------- Variations (extra work needing customer approval) ----------
+    const pv = await handleVariations({ env, request, parts, body, user, json, err });
+    if (pv) return pv;
 
     // ---------- Phase 2 features ----------
     const extra = await handleExtra({ env, request, url, parts, body, user, json, err });

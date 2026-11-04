@@ -48,7 +48,7 @@ const formData = (form) => Object.fromEntries(new FormData(form).entries());
 
 // ---------- Shell ----------
 function shell(active, html) {
-  const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['invoices', 'Invoices'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['templates', 'Quote Templates'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
+  const links = [['dashboard', 'Dashboard'], ['today', 'My Jobs'], ['jobs', 'Jobs'], ['variations', 'Variations'], ['invoices', 'Invoices'], ['schedule', 'Schedule'], ['clients', 'Clients'], ['suppliers', 'Suppliers'], ['pricelist', 'Price List'], ['templates', 'Quote Templates'], ['expenses', 'Expenses'], ['reports', 'Reports'], ['staff', 'Staff'], ['import', 'Import'], ['integrations', 'Integrations'], ['settings', 'Settings']];
   $app.innerHTML = `
     <div class="topbar"><a class="brand" href="#/dashboard" title="Dashboard">⚡ SPARK</a><button class="sec menubtn" id="menubtn" aria-label="Menu">☰ ${esc((links.find(([k]) => k === active) || [0, 'Menu'])[1])}</button>
       <nav id="nav">${links.filter(([k]) => k !== 'dashboard').map(([k, l]) => `<a href="#/${k}" class="${active === k ? 'on' : ''}">${l}</a>`).join('')}</nav>
@@ -399,7 +399,7 @@ xs.onload = () => {
   // extras3.js builds on extras.js (reports + job page), so it must load second
   const x3 = document.createElement('script');
   x3.src = '/spark/extras3.js';
-  x3.onload = () => { const x4 = document.createElement('script'); x4.src = '/spark/extras4.js'; x4.onload = boot; x4.onerror = boot; document.head.appendChild(x4); }; x3.onerror = boot;
+  x3.onload = () => { const x4 = document.createElement('script'); x4.src = '/spark/extras4.js'; x4.onload = () => { const x5 = document.createElement('script'); x5.src = '/spark/extras5.js'; x5.onload = boot; x5.onerror = boot; document.head.appendChild(x5); }; x4.onerror = boot; document.head.appendChild(x4); }; x3.onerror = boot;
   document.head.appendChild(x3);
 };
 xs.onerror = boot;

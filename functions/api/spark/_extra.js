@@ -17,7 +17,7 @@ export async function totals(env, jobId) {
   return { subtotal, gst, gst_on: G.enabled, gst_pct: G.pct, total, cost: r2(t.c), paid: r2(p.p), balance: r2(total - p.p) };
 }
 
-async function ensureToken(env, jobId) {
+export async function ensureToken(env, jobId) {
   const j = await env.DB.prepare('SELECT portal_token FROM jobs WHERE id=?').bind(jobId).first();
   if (j && j.portal_token) return j.portal_token;
   const tok = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => b.toString(36).padStart(2, '0')).join('');
@@ -25,8 +25,8 @@ async function ensureToken(env, jobId) {
   return tok;
 }
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const money = (n) => '$' + (Number(n) || 0).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export async function sendMail(env, { to, subject, html, text, replyTo }) {
   const key = env.MAILGUN_API_KEY && String(env.MAILGUN_API_KEY).trim();
