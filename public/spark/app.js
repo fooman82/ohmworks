@@ -178,22 +178,22 @@ function attachDateTimePicker(input, opts) {
     const ov = document.createElement('div');
     ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;display:flex;align-items:center;justify-content:center;padding:8px';
     const box = document.createElement('div');
-    box.style.cssText = 'background:#fff;color:#111;border-radius:10px;width:min(100%,720px);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4)';
+    box.style.cssText = 'background:var(--panel,#fff);color:var(--text,#111);border:1px solid var(--line,#ddd);border-radius:10px;width:min(100%,720px);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.4)';
     ov.appendChild(box);
     const render = () => {
       const days = Array.from({ length: cols }, (_, i) => { const d = new Date(first); d.setDate(d.getDate() + i); return d; });
       const today = ymd(new Date());
-      box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid #ddd">
+      box.innerHTML = `<div style="display:flex;align-items:center;gap:6px;padding:8px;border-bottom:1px solid var(--line,#ddd)">
           <button type="button" data-n="-${cols}" style="min-width:44px">‹</button><button type="button" data-today>Today</button><button type="button" data-n="${cols}" style="min-width:44px">›</button>
           <span style="flex:1"></span><label style="font-size:13px">Minutes <select data-mi>${[0, 15, 30, 45].map((m) => `<option value="${m}" ${m === mins ? 'selected' : ''}>${pad(m)}</option>`).join('')}</select></label>
           <button type="button" data-clear>Clear</button><button type="button" data-close>✕</button></div>
         <div data-scroll style="overflow-y:auto;position:relative;flex:1;min-height:200px;height:${ROW * 10}px">
-          <div style="display:grid;grid-template-columns:52px repeat(${cols},1fr);position:sticky;top:0;background:#f4f4f4;z-index:1;border-bottom:1px solid #ddd">
-            <div></div>${days.map((d) => `<div style="text-align:center;padding:6px 2px;font-size:13px;${ymd(d) === today ? 'font-weight:700;color:#0b79d0' : ''}">${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</div>`).join('')}</div>
+          <div style="display:grid;grid-template-columns:52px repeat(${cols},1fr);position:sticky;top:0;background:var(--bg,#f4f4f4);z-index:1;border-bottom:1px solid var(--line,#ddd)">
+            <div></div>${days.map((d) => `<div style="text-align:center;padding:6px 2px;font-size:13px;${ymd(d) === today ? 'font-weight:700;color:var(--accent,#0b79d0)' : ''}">${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</div>`).join('')}</div>
           <div style="display:grid;grid-template-columns:52px repeat(${cols},1fr)">
-            ${Array.from({ length: 24 }, (_, h) => `<div style="height:${ROW}px;font-size:12px;color:#666;text-align:right;padding:8px 6px 0 0;box-sizing:border-box">${pad(h)}:00</div>${days.map((d) => {
+            ${Array.from({ length: 24 }, (_, h) => `<div style="height:${ROW}px;font-size:12px;color:var(--muted,#666);text-align:right;padding:8px 6px 0 0;box-sizing:border-box">${pad(h)}:00</div>${days.map((d) => {
               const sel = cur && ymd(cur.d) === ymd(d) && cur.h === h;
-              return `<button type="button" data-d="${ymd(d)}" data-h="${h}" style="height:${ROW}px;border:1px solid #e3e3e3;margin:0;border-radius:0;cursor:pointer;background:${sel ? '#0b79d0' : (h < opts.start || h >= opts.end ? '#fafafa' : '#fff')};color:${sel ? '#fff' : '#111'}">${sel ? pad(h) + ':' + pad(cur.mi) : ''}</button>`;
+              return `<button type="button" data-d="${ymd(d)}" data-h="${h}" style="height:${ROW}px;border:1px solid var(--line,#e3e3e3);margin:0;border-radius:0;cursor:pointer;padding:0;font-weight:400;background:${sel ? 'var(--primary,#0b79d0)' : (h < opts.start || h >= opts.end ? 'var(--bg,#fafafa)' : 'var(--panel,#fff)')};color:${sel ? '#fff' : 'var(--text,#111)'}">${sel ? pad(h) + ':' + pad(cur.mi) : ''}</button>`;
             }).join('')}`).join('')}
           </div></div>`;
       const sc = box.querySelector('[data-scroll]');
@@ -202,7 +202,7 @@ function attachDateTimePicker(input, opts) {
     };
     const close = () => { document.removeEventListener('keydown', key); ov.remove(); };
     const key = (e) => { if (e.key === 'Escape') close(); };
-    const commit = (v) => { input.value = v; input.dispatchEvent(new Event('change', { bubbles: true })); close(); };
+    const commit = (v) => { input.value = v; input.dispatchEvent(new Event('change', { bubbles: true })); if (opts.onPick) opts.onPick(v); close(); };
     box.onclick = (e) => {
       const t = e.target.closest('button'); if (!t) return;
       if (t.dataset.n) { first.setDate(first.getDate() + Number(t.dataset.n)); render(); }
@@ -273,10 +273,17 @@ async function jobPage(id, params) {
     };
   }
   {
-    let ps = 6, pe = 18;
-    try { const st = await api('settings'); const a = Number(st.picker_start_hour), b = Number(st.picker_end_hour); if (st.picker_start_hour !== undefined && st.picker_start_hour !== '' && a >= 0 && a <= 23) ps = a; if (st.picker_end_hour !== undefined && st.picker_end_hour !== '' && b >= 1 && b <= 24) pe = b; if (pe <= ps) { ps = 6; pe = 18; } } catch { /* defaults */ }
+    let ps = 6, pe = 18, minH = 1;
+    try { const st = await api('settings'); const a = Number(st.picker_start_hour), b = Number(st.picker_end_hour); if (st.picker_start_hour !== undefined && st.picker_start_hour !== '' && a >= 0 && a <= 23) ps = a; if (st.picker_end_hour !== undefined && st.picker_end_hour !== '' && b >= 1 && b <= 24) pe = b; if (pe <= ps) { ps = 6; pe = 18; } const mh = Number(st.job_min_hours); if (st.job_min_hours !== undefined && st.job_min_hours !== '' && Number.isFinite(mh) && mh > 0) minH = mh; } catch { /* defaults */ }
     const sIn = $('#f [name=scheduled_start]'), eIn = $('#f [name=scheduled_end]');
-    attachDateTimePicker(sIn, { start: ps, end: pe });
+    const p2 = (n) => String(n).padStart(2, '0');
+    // Picking a start sets the end to start + "Job minimum hours"
+    attachDateTimePicker(sIn, { start: ps, end: pe, onPick: (v) => {
+      const m = /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/.exec(v || '');
+      if (!m) return;
+      const t = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5] + Math.round(minH * 60));
+      eIn.value = `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`;
+    } });
     attachDateTimePicker(eIn, { start: ps, end: pe, fallback: () => sIn.value });
   }
   $('#f').onsubmit = (e) => { e.preventDefault(); act(async () => {
