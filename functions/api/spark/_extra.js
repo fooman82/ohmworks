@@ -77,7 +77,14 @@ async function buildEmail(env, origin, job, kind, message) {
     <p><a href="${link}" style="background:#0b79d0;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${kind === 'quote' ? 'View &amp; accept quote' : 'View online'}</a></p>
     ${bank}<p style="color:#666;font-size:12px">${esc(terms || '')}</p></div>`;
   const text = `${heading}\n\nHi ${job.client_name},\n\n${intro}\n\n${job.title}${job.description && (kind === 'quote' || kind === 'invoice') ? `\n\n${job.description}` : ''}\nTotal: ${money(t.total)}${t.paid ? `\nBalance: ${money(t.balance)}` : ''}\n\nView online: ${link}\n\n${s.business_name} ${s.phone}\nhttp://www.ohmworks.com.au`;
-  return { subject: `${heading.trim()} – ${job.title} – ${s.business_name}`, html, text };
+  const biz = s.business_name || 'OHMWORKS';
+  const subjectLead = {
+    quote: `Quote ${job.id}`,
+    invoice: `Invoice ${inv ? inv.number : job.id}`,
+    reminder: `Payment reminder ${inv ? inv.number : job.id}`,
+    booking: `Booking confirmation ${job.id}`,
+  }[kind] || heading.trim();
+  return { subject: `${subjectLead} from ${biz} for ${job.client_name}`, html, text };
 }
 
 const addInterval = (dateStr, rule) => {
