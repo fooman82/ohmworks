@@ -111,20 +111,18 @@ export async function handleVariations({ env, request, parts, body, user, json, 
   if (sub === 'items') {
     if (!EDITABLE.includes(v.status)) return err('Withdraw the variation before changing its lines');
     if (method === 'POST') {
-      let description = String(body.description || '').trim().slice(0, 300);
+      let description = '';
       const qty = Number(body.qty) || 1;
       let price = body.unit_price === '' || body.unit_price == null ? null : Number(body.unit_price);
-      let cost = Number(body.cost) || 0, itemId = null;
-      // Price list item: its name, cost and price are the defaults; a price typed by the user overrides it.
-      if (body.item_id !== '' && body.item_id != null) {
-        const p = await env.DB.prepare('SELECT id, name, unit_price, cost FROM price_list WHERE id=?').bind(Number(body.item_id)).first();
-        if (!p) return err('Price list item not found');
-        itemId = p.id; cost = p.cost;
-        if (!description) description = p.name;
-        if (price === null) price = p.unit_price;
-      }
-      if (!description) return err('Description required');
-      if (!Number.isFinite(qty) || qty <= 0 || price === null || !Number.isFinite(price)) return err('Enter a quantity and price');
+      let cost = 0, itemId = null;
+      // Every line comes from the price list: the description is fixed to the item's name and the
+      // unit price (ex GST) defaults to its sell price. A price typed by the user overrides it.
+      if (body.item_id === '' || body.item_id == null) return err('Choose an item from the price list');
+      const p = await env.DB.prepare('SELECT id, name, unit_price, cost FROM price_list WHERE id=?').bind(Number(body.item_id)).first();
+      if (!p) return err('Price list item not found');
+      itemId = p.id; cost = p.cost; description = String(p.name).slice(0, 300);
+      if (price === null) price = p.unit_price;
+      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price)) return err('Enter a quantity and price');
       await env.DB.prepare('INSERT INTO variation_items (variation_id,description,qty,unit_price,cost,item_id) VALUES (?,?,?,?,?,?)').bind(id, description, qty, price, cost, itemId).run();
       await env.DB.prepare(`UPDATE variations SET status='draft' WHERE id=?`).bind(id).run();
       return json({ ok: true }, 201);

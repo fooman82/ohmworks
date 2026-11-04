@@ -28,8 +28,8 @@ async function renderCard(jobId, job, card) {
         ${v.status === 'approved' ? `<p class="ok">✅ Approved by <b>${esc(v.approved_name)}</b> on ${fmtDT(v.decided_at + 'Z')}. You can proceed with this work.</p>` : ''}
         ${v.status === 'declined' ? `<p style="color:var(--bad)">❌ Declined${v.decline_reason ? ': ' + esc(v.decline_reason) : ''}. <b>Do not proceed</b> with this work.</p>` : ''}
         ${v.status === 'sent' ? `<p class="muted">⏳ Sent ${fmtDT(v.sent_at + 'Z')}. <b>Do not proceed</b> until the customer approves.</p>` : ''}
-        ${editable ? `<form class="row" data-vadd="${v.id}" style="margin-top:6px"><input type="hidden" name="item_id"><select data-vpick class="grow"><option value="">Price list…</option>${pl.map((p) => `<option value="${p.id}" data-n="${esc(p.name)}" data-p="${p.unit_price}">${esc(p.name)} — ${money(p.unit_price)}</option>`).join('')}</select>
-          <input name="description" placeholder="Line description" class="grow" required><input name="qty" type="number" step="0.01" value="1" style="width:80px"><input name="unit_price" type="number" step="0.01" placeholder="Unit $ ex GST" style="width:130px" required><button class="sec">Add line</button></form>` : ''}
+        ${editable ? `<form class="row" data-vadd="${v.id}" style="margin-top:6px"><input type="hidden" name="item_id"><select data-vpick class="grow" required><option value="">Choose price list item…</option>${pl.map((p) => `<option value="${p.id}" data-n="${esc(p.name)}" data-p="${p.unit_price}">${esc(p.name)} — ${money(p.unit_price)}</option>`).join('')}</select>
+          <input name="description" placeholder="Description (from price list)" class="grow" readonly tabindex="-1" style="opacity:.8"><input name="qty" type="number" step="0.01" value="1" style="width:80px"><input name="unit_price" type="number" step="0.01" placeholder="Unit $ ex GST" style="width:130px" required><button class="sec">Add line</button></form>` : ''}
         <div class="row" style="margin-top:8px">
           ${editable ? `<button data-vsend="${v.id}">✉ ${v.status === 'declined' ? 'Re-send' : 'Send'} for approval</button>` : ''}
           ${v.status === 'sent' ? `<button class="sec" data-vsend="${v.id}">✉ Resend</button><button class="sec" data-vwithdraw="${v.id}">Withdraw</button>` : ''}
@@ -47,11 +47,12 @@ async function renderCard(jobId, job, card) {
   const nv = card.querySelector('#vnew');
   if (nv) nv.onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`jobs/${jobId}/variations`, 'POST', formData(e.target)); toast('Variation created. Add the quote lines.'); redo(); }); };
   fn('[data-vadd]', (f) => {
-    // Choosing a price list item fills the description and unit price; both stay editable (override).
+    // Choosing a price list item fills the (read-only) description and the sell price ex GST.
     f.querySelector('[data-vpick]').onchange = (e) => {
       const o = e.target.selectedOptions[0];
       f.querySelector('[name=item_id]').value = o.value;
-      if (o.value) { f.querySelector('[name=description]').value = o.dataset.n; f.querySelector('[name=unit_price]').value = o.dataset.p; }
+      f.querySelector('[name=description]').value = o.value ? o.dataset.n : '';
+      f.querySelector('[name=unit_price]').value = o.value ? o.dataset.p : '';
     };
     f.onsubmit = (e) => { e.preventDefault(); act(async () => { await api(`variations/${f.dataset.vadd}/items`, 'POST', formData(f)); redo(); }); };
   });
