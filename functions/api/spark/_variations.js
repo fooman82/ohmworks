@@ -111,11 +111,21 @@ export async function handleVariations({ env, request, parts, body, user, json, 
   if (sub === 'items') {
     if (!EDITABLE.includes(v.status)) return err('Withdraw the variation before changing its lines');
     if (method === 'POST') {
-      const description = String(body.description || '').trim().slice(0, 300);
-      const qty = Number(body.qty), price = Number(body.unit_price), cost = Number(body.cost) || 0;
+      let description = String(body.description || '').trim().slice(0, 300);
+      const qty = Number(body.qty) || 1;
+      let price = body.unit_price === '' || body.unit_price == null ? null : Number(body.unit_price);
+      let cost = Number(body.cost) || 0, itemId = null;
+      // Price list item: its name, cost and price are the defaults; a price typed by the user overrides it.
+      if (body.item_id !== '' && body.item_id != null) {
+        const p = await env.DB.prepare('SELECT id, name, unit_price, cost FROM price_list WHERE id=?').bind(Number(body.item_id)).first();
+        if (!p) return err('Price list item not found');
+        itemId = p.id; cost = p.cost;
+        if (!description) description = p.name;
+        if (price === null) price = p.unit_price;
+      }
       if (!description) return err('Description required');
-      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price)) return err('Enter a quantity and price');
-      await env.DB.prepare('INSERT INTO variation_items (variation_id,description,qty,unit_price,cost) VALUES (?,?,?,?,?)').bind(id, description, qty, price, cost).run();
+      if (!Number.isFinite(qty) || qty <= 0 || price === null || !Number.isFinite(price)) return err('Enter a quantity and price');
+      await env.DB.prepare('INSERT INTO variation_items (variation_id,description,qty,unit_price,cost,item_id) VALUES (?,?,?,?,?,?)').bind(id, description, qty, price, cost, itemId).run();
       await env.DB.prepare(`UPDATE variations SET status='draft' WHERE id=?`).bind(id).run();
       return json({ ok: true }, 201);
     }
@@ -180,7 +190,7 @@ export async function handlePortalVariations({ env, request, parts, body, json, 
       const upd = await env.DB.prepare(`UPDATE variations SET status='approved', decided_at=datetime('now'), approved_name=?, approval_signature=?, applied_at=datetime('now') WHERE id=? AND status='sent'`)
         .bind(name, body.signature, v.id).run();
       if (upd.meta.changes) {
-        await env.DB.prepare('INSERT INTO job_items (job_id,description,qty,unit_price,cost) SELECT ?, ?||description, qty, unit_price, cost FROM variation_items WHERE variation_id=?')
+        await env.DB.prepare('INSERT INTO job_items (job_id,description,qty,unit_price,cost,item_id) SELECT ?, ?||description, qty, unit_price, cost, item_id FROM variation_items WHERE variation_id=?')
           .bind(job.id, `Variation ${label(v)}: `, v.id).run();
         await env.DB.prepare('INSERT INTO job_notes (job_id,body) VALUES (?,?)').bind(job.id, `✅ Variation ${label(v)} APPROVED online by ${name}. You can proceed with this work.`).run();
       }
